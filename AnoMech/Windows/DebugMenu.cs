@@ -9,6 +9,7 @@ using AnoMech.Scenarios;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Environment;
@@ -20,6 +21,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using AnoMech.Core.Native.Interfaces;
+using AnoMech.Core.UserActions.Jobs;
 
 namespace AnoMech.Windows;
 
@@ -36,6 +38,10 @@ internal sealed unsafe class DebugMenu
     private readonly LockReplayDebug lockReplayDebug = new();
     private readonly PacketCaptureDebug packetCaptureDebug = new();
     private readonly PreloadActionTmbTap preloadActionTmbTap = new();
+    private readonly Queue<string> spellTimingLines = new();
+    private string? spellTimingPath;
+    private bool spellTimingActive;
+    private bool spellTimingWriteFailed;
 
     public DebugMenu(Plugin plugin)
     {
@@ -43,11 +49,15 @@ internal sealed unsafe class DebugMenu
         // The position log samples off the framework tick, not this window's draw cadence.
         Plugin.Framework.Update += OnFrameworkUpdate;
         InstallRecastTimesTap();
+        Natives.UserActions.Acted += CaptureActionTiming;
     }
 
     public void Dispose()
     {
         Plugin.Framework.Update -= OnFrameworkUpdate;
+        Natives.UserActions.Acted -= CaptureActionTiming;
+        PlayerActionTrace.Sink = null;
+        FlushSpellTiming();
         recastTimesHook?.Disable();
         recastTimesHook?.Dispose();
         positionLogActionEffectHook?.Disable();
@@ -62,6 +72,84 @@ internal sealed unsafe class DebugMenu
         actorControlDebug.Tick();
         lockReplayDebug.Tick();
         packetCaptureDebug.Tick();
+        FlushSpellTiming();
+    }
+
+    private void CaptureActionTiming(PlayerAction action)
+    {
+        const uint fireIV = 3577;
+        if (!PlayerActionTrace.Active || action.ActionType != ActionType.Action) return;
+        PlayerActionTrace.Write($"Action {action.Step} id={action.ActionId} [{PlayerActionTrace.Snapshot(ActionManager.Instance())}] {PlayerActionTrace.BlackMageState()}");
+        if (action.ActionId != fireIV) return;
+
+        var player = (BattleChara*)(Plugin.ObjectTable.LocalPlayer?.Address ?? 0);
+        if (player == null) return;
+
+        bool leyLines = false, circleOfPower = false;
+        foreach (var status in player->StatusManager.Status)
+        {
+            leyLines |= status.StatusId == BlackMageStateHandler.LeyLinesStatus;
+            circleOfPower |= status.StatusId == BlackMageStateHandler.CircleOfPower;
+        }
+
+        var cast = ActionManager.GetAdjustedCastTime(ActionType.Action, fireIV, false, null);
+        var recast = ActionManager.GetAdjustedRecastTime(ActionType.Action, fireIV);
+        var timing = PlayerStats.ReadAttackTiming();
+        var castBar = action.Step == PlayerActionStep.CastStarted ? $" castBar={action.CastSeconds * 1000:F0}ms" : "";
+        spellTimingLines.Enqueue($"[{DateTime.Now:HH:mm:ss.fff}] Fire IV {action.Step}{castBar} " +
+            $"adjustedCast={cast}ms recast={recast}ms LeyLines={leyLines} CircleOfPower={circleOfPower} " +
+            $"Haste={timing?.Haste}% Delay={timing?.Delay}ms");
+    }
+
+    private void ToggleSpellTiming()
+    {
+        if (spellTimingActive)
+        {
+            spellTimingActive = false;
+            PlayerActionTrace.Sink = null;
+            FlushSpellTiming();
+            return;
+        }
+
+        if (DiagnosticLog.LogDirectory is not { } logDir) return;
+        var directory = Path.Combine(logDir, "captures");
+        var started = DateTime.Now;
+        var path = Path.Combine(directory, $"spell-timing-{started:yyyyMMdd-HHmmss-fff}.txt");
+        try
+        {
+            Directory.CreateDirectory(directory);
+            using (var writer = new StreamWriter(new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read)))
+                writer.WriteLine($"Black Mage action timing capture started {started:O}");
+            spellTimingPath = path;
+            spellTimingWriteFailed = false;
+            spellTimingActive = true;
+            PlayerActionTrace.Sink = spellTimingLines.Enqueue;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            spellTimingWriteFailed = true;
+            DiagnosticLog.Warn($"[SpellTiming] Could not start capture at {path}: {e.Message}");
+        }
+    }
+
+    private void FlushSpellTiming()
+    {
+        if (spellTimingLines.Count == 0 || spellTimingPath == null) return;
+        try
+        {
+            File.AppendAllLines(spellTimingPath, spellTimingLines);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            spellTimingActive = false;
+            PlayerActionTrace.Sink = null;
+            spellTimingWriteFailed = true;
+            DiagnosticLog.Warn($"[SpellTiming] Could not write {spellTimingPath}: {e.Message}");
+        }
+        finally
+        {
+            spellTimingLines.Clear();
+        }
     }
 
     // Targeting a client-side actor sends its fake entity id to the server unless a run's
@@ -252,6 +340,13 @@ internal sealed unsafe class DebugMenu
 
         ImGui.Spacing();
         DrawPositionLogger();
+
+        if (DiagnosticLog.LogDirectory == null)
+            ImGui.TextDisabled("Action timing capture unavailable.");
+        else if (ImGui.Button(spellTimingActive ? "Stop action timing capture" : "Start action timing capture"))
+            ToggleSpellTiming();
+        if (spellTimingWriteFailed) ImGui.TextUnformatted("Action timing capture failed. See the Dalamud log.");
+        if (spellTimingPath != null) ImGui.TextWrapped(spellTimingPath);
 
         ImGui.Spacing();
         ImGui.TextUnformatted("Player activity (live)");

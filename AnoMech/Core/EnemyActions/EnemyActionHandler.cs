@@ -68,7 +68,8 @@ internal sealed class EnemyActionHandler(SimCharacter caster, SimCast cast, SimW
             if (releasing == handle) releasing = null;
             if (handle.IsCancelled) return;
             if (casting == handle) casting = null;
-            Release(action, target, location, castTarget, animationVariation, delivery);
+            if (!action.ResolveOnly)
+                Release(action, target, location, castTarget, animationVariation, delivery);
         });
     }
 
@@ -176,7 +177,7 @@ internal sealed class EnemyActionHandler(SimCharacter caster, SimCast cast, SimW
 
         delivery.Outcomes = ctx.Outcomes;
         // Ahead of the deaths it shares a time with, so the killing hit lands on a living target.
-        if (ctx.Outcomes.Any(o => o.Damage is not null))
+        if (!action.ResolveOnly && ctx.Outcomes.Any(o => o.Damage is not null))
             Schedule(action.Timing.DamageDelay, () => ConfirmDamage(delivery));
         foreach (var (status, revealAt) in ctx.HiddenStatuses)
             Schedule(revealAt, status.Reveal);

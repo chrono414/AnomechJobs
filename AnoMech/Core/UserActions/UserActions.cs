@@ -16,22 +16,27 @@ namespace AnoMech.Core.UserActions;
 public sealed unsafe class UserActions : IUserActions
 {
     private readonly ILocalPlayerInput hooks;
+    private readonly BlackMageStateHandler blackMage = new();
+    private readonly HasteHandler haste = new();
+    private readonly TimedGaugeHandler timedGauges = new();
 
-    // OnAction is the action's RESOLUTION — immediately for an instant cast, on completion for a hard
+    // OnAction is the action's RESOLUTION â€” immediately for an instant cast, on completion for a hard
     // cast, and not at all if the cast is interrupted (a spell resolves when its cast bar finishes, not
     // when it starts). In order: ResetHandler first so every other handler's OnScenarioStart lands on
     // the reset; CastTimeHandler before JobActionHandler, which clears the statuses it checks; and
     // JobActionHandler and the state handlers before ActionEffectHandler so their combo-gated logic reads the
     // pre-advance combo state.
-    private readonly List<IUserActionHandler> handlers =
+    private readonly List<IUserActionHandler> handlers;
+
+    private List<IUserActionHandler> CreateHandlers() =>
     [
         new ResetHandler(),
         new SprintHandler(),
         new CastTimeHandler(),
+        blackMage,
         new JobActionHandler(),
         new LimitBreakHandler(),
         new SamuraiStateHandler(),
-        new BlackMageStateHandler(),
         new SummonerStateHandler(),
         new AstrologianStateHandler(),
         new MonkStateHandler(),
@@ -40,21 +45,17 @@ public sealed unsafe class UserActions : IUserActions
         new ViperStateHandler(),
         new NinjaStateHandler(),
         new ActionEffectHandler(),
-        new TimedGaugeHandler(),
+        timedGauges,
         new CastInterruptHandler(),
-        new AutoAttackHandler(),
+        haste,
+        new AutoAttackHandler(haste),
     ];
 
     // A hard cast whose effects are deferred until it completes.
-    private bool pendingResolve;
-    private ActionType pendingType;
-    private uint pendingAction;
-    private ulong pendingTarget;
+    private LocalActionExecution? pendingCast;
     private float pendingTotal, pendingMax;
 
-    // Dedup gate: LastUsedActionSequence advances only at an action's actual execution,
-    // so this skips both a queued (spammed) press carrying the PRIOR action's sequence
-    // and a handler's own re-entrant fire (ActionEffect Receive re-enters the hook).
+    // Both native hooks can report the same execution when UseAction calls UseActionLocation.
     private ushort processedSeq;
 
     // Unlike statuses (cleared on the SimPlayer's Despawn), the job gauge survives a scenario
@@ -66,7 +67,7 @@ public sealed unsafe class UserActions : IUserActions
 
     public event Action<PlayerAction>? Acted;
 
-    // The module only acts while the sim zone is loaded — never in a real duty / open
+    // The module only acts while the sim zone is loaded â€” never in a real duty / open
     // world, where the client is server-connected and our synthetic packets/writes
     // would be harmful.
     private static bool SimActive => Plugin.Game?.World.Map.IsInInstance ?? false;
@@ -74,6 +75,7 @@ public sealed unsafe class UserActions : IUserActions
     public UserActions(ILocalPlayerInput hooks)
     {
         this.hooks = hooks;
+        handlers = CreateHandlers();
         hooks.ActionExecuted += OnActionExecuted;
         hooks.AdjustActionId = AdjustActionId;
         hooks.AdjustCastTime = AdjustCastTime;
@@ -86,14 +88,21 @@ public sealed unsafe class UserActions : IUserActions
     private bool Runs(IUserActionHandler handler) => Enabled || handler.RunsWhenDisabled;
 
     public void Enable() => Enabled = true;
-    public void Disable() => Enabled = false;
+    public void Disable()
+    {
+        Enabled = false;
+        haste.OnSessionEnd();
+        blackMage.OnSessionEnd();
+    }
 
     // Called by Game at scenario start.
     public void OnScenarioStart()
     {
-        pendingResolve = false;
+        pendingCast = null;
         if (!SimActive) return;
         foreach (var handler in handlers) if (Runs(handler)) handler.OnScenarioStart();
+        if (Enabled && Plugin.Game is { } game)
+            JobStartingState.Apply(game.World.Map.TerritoryId, blackMage, timedGauges);
     }
 
     // Called by Game when the sim zone first loads (a true session start, not a restart within
@@ -112,6 +121,8 @@ public sealed unsafe class UserActions : IUserActions
     {
         if (gaugeSnapshot is { } snapshot) JobGaugeEdit.Restore(snapshot);
         gaugeSnapshot = null;
+        pendingCast = null;
+        foreach (var handler in handlers) handler.OnSessionEnd();
     }
 
     // Called each frame by Plugin.OnFrameworkUpdate.
@@ -122,27 +133,28 @@ public sealed unsafe class UserActions : IUserActions
         ResolvePendingCast();
     }
 
-    private void OnActionExecuted(ActionType actionType, uint actionId, ulong targetId)
+    private void OnActionExecuted(LocalActionExecution action)
     {
         if (!SimActive) return;
         var am = ActionManager.Instance();
         if (am == null) return;
-        var seq = am->LastUsedActionSequence;
-        if (seq == processedSeq) return; // queued press / re-entrant fire — already handled
+        var (actionType, actionId, targetId, _, seq) = action;
+#if DEBUG
+        if (actionType == ActionType.Action && PlayerActionTrace.Active)
+            PlayerActionTrace.Write($"Dispatch action={actionId} previousSeq={processedSeq} duplicate={seq == processedSeq} [{PlayerActionTrace.Snapshot(am)}]");
+#endif
+        if (seq == processedSeq) return; // queued press / re-entrant fire â€” already handled
         processedSeq = seq;
 
-        // Effects resolve when the cast finishes. Instant (or made instant) → now; a real cast bar
-        // this action started → deferred to completion (see ResolvePendingCast). The ActionId match
+        // Effects resolve when the cast finishes. Instant (or made instant) â†’ now; a real cast bar
+        // this action started â†’ deferred to completion (see ResolvePendingCast). The ActionId match
         // keeps oGCDs woven during another cast from being mistaken for a hard cast.
         var bc = (BattleChara*)(Plugin.ObjectTable.LocalPlayer?.Address ?? 0);
         bool hardCast = bc != null && bc->CastInfo.IsCasting && bc->CastInfo.TotalCastTime > 0.1f
                         && bc->CastInfo.ActionId == actionId;
         if (hardCast)
         {
-            pendingResolve = true;
-            pendingType = actionType;
-            pendingAction = actionId;
-            pendingTarget = targetId;
+            pendingCast = action;
             pendingTotal = bc->CastInfo.TotalCastTime;
             pendingMax = bc->CastInfo.CurrentCastTime;
             Acted?.Invoke(new PlayerAction(PlayerActionStep.CastStarted, actionType, actionId, targetId, pendingTotal));
@@ -150,43 +162,50 @@ public sealed unsafe class UserActions : IUserActions
         }
         else
         {
-            Acted?.Invoke(new PlayerAction(PlayerActionStep.Resolved, actionType, actionId, targetId));
-            foreach (var handler in handlers) if (Runs(handler)) handler.OnAction(actionType, actionId, targetId);
+            ResolveAction(action);
         }
     }
 
     // Fires the deferred hard-cast effects once the cast completes; drops them if it was interrupted.
     private void ResolvePendingCast()
     {
-        if (!pendingResolve) return;
+        if (pendingCast is not { } action) return;
         var bc = (BattleChara*)(Plugin.ObjectTable.LocalPlayer?.Address ?? 0);
-        if (bc == null) { pendingResolve = false; return; }
+        if (bc == null) { pendingCast = null; return; }
 
-        if (bc->CastInfo.IsCasting && bc->CastInfo.ActionId == pendingAction)
+        if (bc->CastInfo.IsCasting && bc->CastInfo.ActionId == action.ActionId)
         {
             if (bc->CastInfo.CurrentCastTime > pendingMax) pendingMax = bc->CastInfo.CurrentCastTime;
             return;
         }
 
+        pendingCast = null;
         // Cast ended: apply only if it reached the slidecast window, which an interrupt never does.
         if (pendingMax >= pendingTotal - Plugin.Config.CastInterruptThreshold)
         {
-            var am = ActionManager.Instance();
-            if (am != null) processedSeq = am->LastUsedActionSequence; // dedup any re-entrant combo fire during dispatch
-            Acted?.Invoke(new PlayerAction(PlayerActionStep.Resolved, pendingType, pendingAction, pendingTarget));
-            foreach (var handler in handlers) if (Runs(handler)) handler.OnAction(pendingType, pendingAction, pendingTarget);
+            ResolveAction(action);
         }
         else
         {
-            Acted?.Invoke(new PlayerAction(PlayerActionStep.Interrupted, pendingType, pendingAction, pendingTarget));
-            foreach (var handler in handlers) if (Runs(handler)) handler.OnCastInterrupted(pendingType, pendingAction);
+#if DEBUG
+            DiagnosticLog.Info($"[CastTiming] {action.ActionId} ended at {pendingMax:F3}/{pendingTotal:F3}s " +
+                $"(god mode={Plugin.Game?.GodMode}, actions locked={Plugin.Game?.Player?.ActionsLocked}).");
+#endif
+            Acted?.Invoke(new PlayerAction(PlayerActionStep.Interrupted, action.Type, action.ActionId, action.TargetId));
+            foreach (var handler in handlers) if (Runs(handler)) handler.OnCastInterrupted(action.Type, action.ActionId);
         }
-        pendingResolve = false;
-        pendingMax = 0;
+    }
+
+    private void ResolveAction(LocalActionExecution action)
+    {
+        Acted?.Invoke(new PlayerAction(PlayerActionStep.Resolved, action.Type, action.ActionId, action.TargetId));
+        foreach (var handler in handlers) if (Runs(handler)) handler.OnAction(action);
     }
 
     public void Dispose()
     {
+        haste.OnSessionEnd();
+        blackMage.OnSessionEnd();
         hooks.ActionExecuted -= OnActionExecuted;
         hooks.AdjustActionId = null;
         hooks.AdjustCastTime = null;

@@ -1,3 +1,5 @@
+using System.Numerics;
+using AnoMech.Core.Native.Interfaces;
 using FFXIVClientStructs.FFXIV.Client.Game;
 
 namespace AnoMech.Core.UserActions;
@@ -19,6 +21,12 @@ internal interface IUserActionHandler
     // Same, for a handler that needs who the action was aimed at.
     void OnAction(ActionType actionType, uint actionId, ulong targetId) => OnAction(actionType, actionId);
 
+    void OnAction(ActionType actionType, uint actionId, ulong targetId, Vector3? location)
+        => OnAction(actionType, actionId, targetId);
+
+    void OnAction(LocalActionExecution action)
+        => OnAction(action.Type, action.ActionId, action.TargetId, action.Location);
+
     // A player action began a cast bar; OnAction follows if it completes, OnCastInterrupted if not.
     void OnCastStart(ActionType actionType, uint actionId) { }
 
@@ -26,6 +34,7 @@ internal interface IUserActionHandler
 
     // A scenario started — reset cooldowns/gauges the server would otherwise track.
     void OnScenarioStart() { }
+    void OnSessionEnd() { }
 
     // Per-frame, for continuous behaviour (e.g. cast interruption).
     void OnTick(float deltaSeconds) { }

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using AnoMech.Core;
 using AnoMech.Core.EnemyActions;
+using AnoMech.Core.Game.Party;
 using AnoMech.Core.SimObjects;
 using static AnoMech.Core.EnemyActions.Distribution;
 using static AnoMech.Core.EnemyActions.EnemyActionEffects;
@@ -567,6 +569,84 @@ public static class UmadActions
         Effects = [Damage(MagicVulns, Lethal)],
         Timing = new() { DamageDelay = 0.18f },
     };
+
+    public static readonly EnemyAction UltimaRepeaterHit = new(UmadConstants.ActionId.UltimaRepeaterHit)
+    {
+        Effects = [Damage(kindOverride: DamageKind.Magic)],
+    };
+
+    public static readonly EnemyAction FellForcesTank = new(UmadConstants.ActionId.FellForcesTank)
+    {
+        Effects = [Damage(split: Stack(2), kindOverride: DamageKind.Magic)],
+        DeathExplanation = "Fell Forces tank stack",
+    };
+
+    public static readonly EnemyAction FellForcesInvuln = FellForcesTank with
+    {
+        Effects = [Damage(kindOverride: DamageKind.Magic)],
+    };
+
+    public static readonly EnemyAction FellForcesHealer = new(UmadConstants.ActionId.FellForcesHealer)
+    {
+        Effects = [Damage(split: Stack(2), kindOverride: DamageKind.Magic)],
+        DeathExplanation = "Fell Forces healer stack",
+    };
+
+    public static readonly EnemyAction FellForcesDps = new(UmadConstants.ActionId.FellForcesDps)
+    {
+        Effects = [Damage(split: Stack(4), kindOverride: DamageKind.Magic)],
+        DeathExplanation = "Fell Forces DPS stack",
+    };
+
+    public static readonly EnemyAction OrchestraFlare = new(UmadConstants.ActionId.Flare)
+    {
+        ResolveOnly = true,
+        Effects = [Damage(MagicVulns, split: Exactly(1)), MagicVulnerabilityUp],
+        DeathExplanation = "Flare spread",
+    };
+
+    public static readonly EnemyAction OrchestraHoly = new(UmadConstants.ActionId.Holy)
+    {
+        ResolveOnly = true,
+        Effects = [Damage(MagicVulns, split: Exactly(1)), ApplyStatus(UmadConstants.StatusId.MagicVulnerabilityUp, 3.96f)],
+        DeathExplanation = "Holy spread",
+    };
+
+    public static readonly EnemyAction OrchestraChaoticFlare = new(UmadConstants.ActionId.ChaoticFlare)
+    {
+        ResolveOnly = true,
+        Effects = [Damage(MagicVulns, split: Exactly(2)), MagicVulnerabilityUp],
+        DeathExplanation = "Chaotic Flare tank stack",
+    };
+
+    public static readonly EnemyAction OrchestraFlareDiffusion = new(UmadConstants.ActionId.FlareDiffusion)
+    {
+        ResolveOnly = true,
+        Effects = [new OrchestraTankStackEffect()],
+        DeathExplanation = "Flare Diffusion",
+    };
+
+    public static readonly EnemyAction OrchestraChaoticHoly = new(UmadConstants.ActionId.ChaoticHoly)
+    {
+        Effects = [Damage(split: Exactly(1))],
+        DeathExplanation = "Chaotic Holy spread",
+    };
+
+    private sealed class OrchestraTankStackEffect : IEnemyActionEffect
+    {
+        private static readonly IEnemyActionEffect TankDamage = Damage(split: Exactly(2));
+
+        public void Apply(EnemyActionContext context, IReadOnlyList<SimCharacter> hits)
+        {
+            var tanks = hits.Where(member => member is ISimPartyMember seat && seat.Role.IsTank()).ToArray();
+            TankDamage.Apply(context, tanks);
+            foreach (var member in hits.Except(tanks))
+            {
+                context.ShowDamage(member, Lethal.FlyTextAmount(kills: true), DamageKind.Magic);
+                context.Kill(member, "caught in the tank stack");
+            }
+        }
+    }
 
     // -- P5 Exaflares --
 

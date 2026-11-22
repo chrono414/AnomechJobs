@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using AnoMech.Core.Native.Interfaces;
 using FFXIVClientStructs.FFXIV.Client.Game;
 
@@ -8,7 +9,7 @@ namespace AnoMech.Tests;
 // Nobody at the keyboard, unless a test holds a movement key.
 internal sealed class FakeLocalPlayerInput : ILocalPlayerInput
 {
-    public event Action<ActionType, uint, ulong>? ActionExecuted { add { } remove { } }
+    public event Action<LocalActionExecution>? ActionExecuted { add { } remove { } }
 
     public bool MovementInputActive { get; set; }
     public bool IsJumping => false;

@@ -24,6 +24,7 @@ namespace AnoMech.Windows;
 
 public unsafe class MainWindow : Window, IDisposable
 {
+    internal JobSettingsWindow JobSettings { get; }
     private const float ScenarioButtonExtraPadding = 6f;
     private const float SetupDropdownWidth = 180f;
 
@@ -104,8 +105,8 @@ public unsafe class MainWindow : Window, IDisposable
     private static string TitleWithVersion()
     {
         var v = Assembly.GetExecutingAssembly().GetName().Version;
-        var version = v is null ? "" : $" v{v.Major}.{v.Minor}.{v.Build}.{v.Revision}";
-        return $"AnoMech{version}";
+        var version = v is null ? "" : v == new Version(0, 0, 0, 0) ? " v0" : $" v{v}";
+        return $"{Plugin.DisplayName}{version}";
     }
 
     // The title bar still shows while the window is collapsed for the run.
@@ -124,6 +125,7 @@ public unsafe class MainWindow : Window, IDisposable
 
         this.plugin = plugin;
         ScenarioPanel = new ScenarioPanelWindow(this);
+        JobSettings = new JobSettingsWindow(this);
         PartyPanel = new PartyPanelWindow(this, Plugin.Multiplayer);
         multiplayerUi = new MultiplayerUi(plugin);
         IsOpen = false;
@@ -144,7 +146,7 @@ public unsafe class MainWindow : Window, IDisposable
         };
         TitleBarButtons.Add(autoCollapseButton);
 
-        // Small gear opens the settings window (same toggle as /anomech config).
+        // Small gear opens the settings window (same toggle as /anomechjobs config).
         TitleBarButtons.Add(new TitleBarButton
         {
             Icon = FontAwesomeIcon.Cog,
@@ -782,6 +784,11 @@ public unsafe class MainWindow : Window, IDisposable
         {
             DrawMultiplayerButton(actionSize);
         }
+
+        if (JobSettings.IsOpen
+            ? DrawSemanticButton("Job Settings", actionSize, SelectionColor)
+            : ImGui.Button("Job Settings", actionSize))
+            JobSettings.IsOpen = !JobSettings.IsOpen;
     }
 
     private void DrawSession()

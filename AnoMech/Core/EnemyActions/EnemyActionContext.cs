@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using AnoMech.Core.Game;
 using AnoMech.Core.Native.Interfaces;
 using AnoMech.Core.SimObjects;
+using AnoMech.Core.UserActions;
 
 namespace AnoMech.Core.EnemyActions;
 
@@ -61,8 +62,9 @@ public sealed class EnemyActionContext
     // Decided now; moves the character after `delay` (null = TimingSpec.DamageDelay), unless it died
     // meanwhile. knockbackRow goes into the ActionEffect; null for a push with no Knockback sheet
     // row. The first push wins.
-    public void Knockback(SimCharacter who, float distance, float speed, float? delay = null, uint? knockbackRow = null)
+    public void Knockback(SimCharacter who, float distance, float speed, float? delay = null, uint? knockbackRow = null, bool resistible = false)
     {
+        if (resistible && who.HasStatus(Mitigation.SurecastStatusId)) return;
         var row = knockbackRow is { } id ? Natives.Data.Knockback(id) : null;
         var from = row switch
         {

@@ -1,11 +1,11 @@
 
-# ![AnoMech](images/icon.png) AnoMech
+# ![AnomechJobs](images/icon.png) AnomechJobs
 
 *Another FFXIV mechanics simulator*
 
 ---
  
-Simulate FFXIV raid mechanics client-side for solo practice. Go to any Inn, open the plugin with `/anomech` and start practicing!
+Simulate FFXIV raid mechanics client-side for solo practice. Go to any Inn, open the plugin with `/anomechjobs` and start practicing!
 
 Thanks to improvemnts by [WorstAquaPlayer](https://github.com/WorstAquaPlayer) plugin is quite stable now! No more 
 crashes after training session.
@@ -23,7 +23,17 @@ While simulating:
 
 ## Installation
 
-See: https://github.com/anomek/MyDalamudPlugins
+Open `/xlsettings` → **Experimental** → **Custom Plugin Repositories**. Add and enable the [AnomechJobs repository feed](https://raw.githubusercontent.com/chrono414/AnomechJobs/main/repo.json), then open `/xlplugins` and install **AnomechJobs**.
+
+### Publishing updates
+
+1. Set a higher four-part `Version` in `AnoMech/AnoMech.csproj` and push the release commit to the public release repository's default branch.
+2. In that repository, open **Actions → Release AnomechJobs → Run workflow** and select the default branch.
+3. Verify the install or update in Dalamud. The workflow builds the x64 Release ZIP, runs the solution tests, publishes a GitHub Release tagged with the assembly version, and updates `repo.json` after downloading and validating the public ZIP.
+
+Users keep the same feed URL across updates. If the release succeeded but the feed update failed, rerun the original workflow run to reuse that release. Each published version has its own tag and ZIP.
+
+AnomechJobs is based on [AnoMech by Anomek](https://github.com/anomek/AnoMech) and distributed under the [GNU AGPL](LICENSE.md).
 
 ## Beta: Advanced Simulation Resolution
 

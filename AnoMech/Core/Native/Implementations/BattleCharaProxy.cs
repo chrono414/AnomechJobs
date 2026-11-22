@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 using AnoMech.Core.Native.Implementations.Interop;
 using AnoMech.Core.Native.Implementations.Pointers;
 using AnoMech.Core.Native.Interfaces;
@@ -24,6 +25,34 @@ internal sealed unsafe class BattleCharaProxy : IBattleCharaProxy
     public static BattleCharaProxy ForSlot(int slot) => new(slot);
 
     private BattleCharaProxy(int slot) => Slot = slot;
+
+    private const string ActorVfxCreateSignature =
+        "40 53 55 56 57 48 81 EC ?? ?? ?? ?? 0F 29 B4 24 ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 0F";
+    private static readonly Lazy<nint> ActorVfxCreate = new(() =>
+    {
+        if (Plugin.SigScanner.TryScanText(ActorVfxCreateSignature, out var address)) return address;
+        Plugin.Log.Warning("Could not locate actor VFX creation.");
+        return 0;
+    });
+
+    public void PlayActorVfx(string path, bool nativeScale)
+    {
+        var actor = Ptr;
+        if (actor == null || ActorVfxCreate.Value == 0 || !Plugin.DataManager.FileExists(path)) return;
+        var create = (delegate* unmanaged<byte*, GameObject*, GameObject*, float, byte, ushort, byte, nint>)ActorVfxCreate.Value;
+        var bytes = Encoding.UTF8.GetBytes(path + "\0");
+        var previousScale = actor->VfxScale;
+        try
+        {
+            if (nativeScale) actor->VfxScale = 1f;
+            fixed (byte* filename = bytes)
+                create(filename, (GameObject*)actor, (GameObject*)actor, -1f, 0, 0, 0);
+        }
+        finally
+        {
+            if (nativeScale) actor->VfxScale = previousScale;
+        }
+    }
 
     public int Slot { get; }
 
@@ -287,7 +316,15 @@ internal sealed unsafe class BattleCharaProxy : IBattleCharaProxy
                 };
         }
         var position = effect.Position;
+#if DEBUG
+        var manager = effect.SourceSequence != 0 && PlayerActionTrace.Active ? ActionManager.Instance() : null;
+        var before = manager != null ? PlayerActionTrace.Snapshot(manager) : null;
+#endif
         ActionEffectHandler.Receive(obj->GetGameObjectId().ObjectId, (Character*)obj, &position, &header, targetEffects, targetIds);
+#if DEBUG
+        if (before != null)
+            PlayerActionTrace.Write($"Reply action={effect.ActionId} sourceSeq={effect.SourceSequence} sentLock={effect.AnimationLock * 1000:F0}ms before [{before}] after [{PlayerActionTrace.Snapshot(manager)}] {PlayerActionTrace.BlackMageState()}");
+#endif
         return sequence;
     }
 

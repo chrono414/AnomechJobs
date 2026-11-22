@@ -695,7 +695,7 @@ public sealed unsafe partial class ZoneControl : IZoneControl
         }
     }
 
-    private ContentFinderCondition? GetContentFinderCondition(uint territoryId)
+    internal static ContentFinderCondition? GetContentFinderCondition(uint territoryId)
     {
         var sheet = Plugin.DataManager.GetExcelSheet<TerritoryType>();
 

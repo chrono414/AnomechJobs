@@ -30,6 +30,9 @@ public readonly record struct Mitigation(
         [1191] = new(Damage: 0.20f),   // Rampart
         [1193] = new(Damage: 0.10f),   // Reprisal (on the enemy)
 
+        // Caster role
+        [168] = new(ShieldHp: 0.30f),                    // Manaward
+
         // PLD
         [82]   = new(Damage: Invulnerable),                   // Hallowed Ground
         [3829] = new(Damage: 0.40f),   // Guardian
@@ -71,12 +74,15 @@ public readonly record struct Mitigation(
         [1931] = new(Damage: 0.80f),   // Gunmetal Soul
     };
 
+    internal const ushort SurecastStatusId = 160;
+    internal const ushort AddleStatusId = 1203;
+
     // The single damage reduction that would let a full-HP target survive the same hit, 0..1:
     // 0.5 means a hit of twice its max HP is survivable. Percentage reductions stack
     // multiplicatively and shrink the hit; shields and bonus max HP add to the pool it lands on.
-    public static float Effective(IEnumerable<ushort> statusIds, DamageKind kind)
+    public static float Effective(IEnumerable<ushort> statusIds, DamageKind kind, float outgoingReduction = 0f)
     {
-        var taken = 1f;
+        var taken = 1f - outgoingReduction;
         var pool = 1f;
         foreach (var id in statusIds)
         {

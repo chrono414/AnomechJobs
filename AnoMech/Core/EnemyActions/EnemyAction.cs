@@ -15,6 +15,9 @@ public sealed record EnemyAction(uint ActionId)
     public IReadOnlyList<IEnemyActionEffect> Effects { get; init; } = [];
     public TimingSpec Timing { get; init; } = new();
 
+    // For an instant action whose visual is played separately. Mechanical effects still resolve.
+    public bool ResolveOnly { get; init; }
+
     // Extra explanation for deaths caused by this action
     public string? DeathExplanation { get; init; }
 

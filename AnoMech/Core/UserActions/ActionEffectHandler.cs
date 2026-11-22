@@ -1,7 +1,8 @@
+using System.Numerics;
 using AnoMech.Core.Native.Implementations;
 using AnoMech.Core.Native.Interfaces;
+using AnoMech.Core.UserActions.Jobs;
 using FFXIVClientStructs.FFXIV.Client.Game;
-using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 
 namespace AnoMech.Core.UserActions;
@@ -13,35 +14,54 @@ namespace AnoMech.Core.UserActions;
 // sees actual, once-per-execution calls.
 internal sealed unsafe class ActionEffectHandler : IUserActionHandler
 {
-    public void OnAction(ActionType actionType, uint actionId)
+    public void OnAction(LocalActionExecution action)
     {
-        if (actionType != ActionType.Action) return;
+        if (action.Type != ActionType.Action) return;
+        var (_, actionId, targetId, location, sequence) = action;
         var role = PlayerCombo.RoleOf(actionId);
 
         var player = BattleCharaProxy.LocalPlayer;
         if (!player.Exists) return;
         var am = ActionManager.Instance();
         if (am == null) return;
+        if (actionId is BlackMageStateHandler.LeyLines or BlackMageStateHandler.Retrace)
+        {
+            player.ReceiveActionEffect(LeyLinesEffect(actionId, player.GameObjectId, player.Position, player.Rotation,
+                sequence));
+            return;
+        }
+
         // SourceSequence makes the client treat it as that action resolving.
-        var target = DeliveryTarget(player);
+        var groundTargeted = location.HasValue && Natives.Data.Action(actionId) is { TargetArea: true };
+        var target = groundTargeted ? default : DeliveryTarget(player, targetId);
+        // A zero-lock reply clears the lock the client started for an instant action.
         player.ReceiveActionEffect(new ActionEffectData(
-            actionId, ActionType.Action, 0f, (ushort)actionId, 0, 0, player.Rotation, player.Position,
-            AnimationTarget: target,
-            // Every action lands so its hit plays on the target; a combo step also carries its marker.
-            Targets: [role == ComboRole.None
+            actionId, ActionType.Action, System.Math.Max(0f, am->AnimationLock), (ushort)actionId, 0, 0, player.Rotation,
+            groundTargeted ? location!.Value : player.Position,
+            AnimationTarget: groundTargeted ? null : target,
+            // A linear combo step needs its marker on the delivered target.
+            Targets: groundTargeted ? [] : [role == ComboRole.None
                 ? new ActionEffectTarget(target)
                 : new ActionEffectTarget(target, [ActionEffectEntry.ActionMarker(actionId, role == ComboRole.Continuation)])],
-            SourceSequence: am->LastUsedActionSequence));
+            SourceSequence: sequence));
     }
 
-    // The player's target, as the server delivers it; the player itself when the target isn't a
-    // registered BattleChara the client could deliver to.
-    private static GameObjectId DeliveryTarget(BattleCharaProxy player)
+    internal static ActionEffectData LeyLinesEffect(uint actionId, GameObjectId self, Vector3 worldPosition,
+        float rotation, ushort sourceSequence)
     {
-        var tgt = (GameObject*)(Plugin.TargetManager.Target?.Address ?? 0);
-        if (tgt == null) return player.GameObjectId;
-        var cm = CharacterManager.Instance();
-        if (cm == null || cm->LookupBattleCharaByEntityId(tgt->EntityId) == null) return player.GameObjectId;
-        return tgt->GetGameObjectId();
+        // Ley Lines applies its status to the source. Retrace reports the existing status on the target.
+        var status = actionId == BlackMageStateHandler.LeyLines
+            ? new ActionEffectEntry(0x0F, 0, 0, 0, 0, 0x80, BlackMageStateHandler.LeyLinesStatus)
+            : ActionEffectEntry.StatusGain(BlackMageStateHandler.LeyLinesStatus);
+        return new ActionEffectData(actionId, ActionType.Action, 0.6f, (ushort)actionId, 0, 0, rotation, worldPosition,
+            Targets: [new ActionEffectTarget(self, [status])], SourceSequence: sourceSequence);
+    }
+
+    private static GameObjectId DeliveryTarget(BattleCharaProxy player, ulong targetId)
+    {
+        var target = (GameObjectId)targetId;
+        // ActionEffect can only deliver to a BattleChara registered with the client.
+        return targetId is not (0 or 0xE0000000) && Natives.BattleCharas.IsInCharacterManager(target.ObjectId)
+            ? target : player.GameObjectId;
     }
 }

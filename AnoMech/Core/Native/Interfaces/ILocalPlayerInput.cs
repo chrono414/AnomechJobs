@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using FFXIVClientStructs.FFXIV.Client.Game;
 
 namespace AnoMech.Core.Native.Interfaces;
@@ -7,8 +8,8 @@ namespace AnoMech.Core.Native.Interfaces;
 // The real player's input: what they're doing, and the locks a mechanic puts on it.
 public interface ILocalPlayerInput : IDisposable
 {
-    // Raised after the player successfully executes an action: type, action id, target id.
-    event Action<ActionType, uint, ulong>? ActionExecuted;
+    // Raised on successful execution. Ground actions include the selected position.
+    event Action<LocalActionExecution>? ActionExecuted;
 
     bool MovementInputActive { get; }
     bool IsJumping { get; }
@@ -36,3 +37,6 @@ public interface ILocalPlayerInput : IDisposable
     Func<ActionType, uint, int?>? AdjustCastTime { get; set; }
     Func<ActionType, uint, bool, uint?>? AdjustActionStatus { get; set; }
 }
+
+public readonly record struct LocalActionExecution(
+    ActionType Type, uint ActionId, ulong TargetId, Vector3? Location, ushort Sequence);

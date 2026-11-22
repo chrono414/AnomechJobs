@@ -14,6 +14,13 @@ internal static unsafe class EventObjectHelper
         var manager = EventObjectManager.Instance();
 
         // Since the Packet Handle method does not return the ID, we do a manual check beforehand, and test if that ID was created.
+        if (manager == null)
+        {
+            slot = -1;
+            eventObject = null;
+            return false;
+        }
+
         if (packet->ObjectIndex == 0xFF) // -1
         {
             var freeId = -1;

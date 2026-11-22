@@ -22,6 +22,8 @@ public sealed class Game : IDisposable
     public SessionMode? Mode => instance?.Mode;
     public IScenario? ActiveScenario => run?.Scenario;
     public bool Paused => run?.Paused ?? false;
+
+    internal float SimulationDelta(float frameDelta) => Paused ? 0f : frameDelta * EventTimeScale;
     public SessionStatus Status => run?.Status ?? (instance is null ? SessionStatus.Offline : SessionStatus.InZone);
     // The current run, else the one that ended last, so its result outlives a Stop.
     public ScenarioSession? LastRun => run ?? endedRun;
@@ -185,9 +187,10 @@ public sealed class Game : IDisposable
         if (instance?.CatchFall() == true && run is not null)
             World.Party.Player?.Die(SimCharacterDeathExtensions.Environment, "Fell off the arena");
         if (Paused) return;
-        Events.Tick(deltaSeconds * EventTimeScale);
-        World.Tick(deltaSeconds * EventTimeScale);
-        run?.Tick(deltaSeconds * EventTimeScale);
+        var simDelta = SimulationDelta(deltaSeconds);
+        Events.Tick(simDelta);
+        World.Tick(simDelta);
+        run?.Tick(simDelta);
     }
 
     // Reports the death even in godmode, so the user learns what would have killed them; only the

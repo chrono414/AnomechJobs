@@ -187,6 +187,8 @@ public abstract class SimCharacter : ISimObject, IPositioned
     internal bool WalksWith(INavigated walker) => ReferenceEquals(Motion, walker);
 
 
+    public void PlayActorVfx(string path, bool nativeScale = false) => Proxy?.PlayActorVfx(path, nativeScale);
+
     public void AttachLockonVfx(uint lockonId) => ActorControl.HeadMarker(lockonId);
 
     // FIXME: minor, keep track of tethers and slots attached to character
@@ -292,6 +294,8 @@ public abstract class SimCharacter : ISimObject, IPositioned
                 ActorControl.GainEffect(status.StatusId, status.Stacks);
         unannouncedGains.Clear();
     }
+
+    internal void SetMana(uint mana) => SendStatusList(Proxy?.Health ?? 0, mana);
 
     private void SendStatusList(uint health, uint mana)
     {

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using AnoMech.Core.Native.Implementations;
 using AnoMech.Core.SimObjects;
@@ -231,18 +232,36 @@ internal static unsafe class JobActions
     private static readonly ResourceGauge SgeAddersting = new() { Read = jgm => jgm->Sage.Addersting, Write = (jgm, v) => jgm->Sage.Addersting = (byte)v, Max = 3 };
     private static readonly ResourceGauge PctPalette = new() { Read = jgm => jgm->Pictomancer.PalleteGauge, Write = (jgm, v) => jgm->Pictomancer.PalleteGauge = (byte)v, Max = 100 };
     private static readonly ResourceGauge PctPaint = new() { Read = jgm => jgm->Pictomancer.Paint, Write = (jgm, v) => jgm->Pictomancer.Paint = (byte)v, Max = 5 };
-    private static readonly ResourceGauge BlmPolyglot = new() { Read = jgm => jgm->BlackMage.PolyglotStacks, Write = (jgm, v) => jgm->BlackMage.PolyglotStacks = (byte)v, Max = 3 };
+    private static readonly ResourceGauge BlmPolyglot = new PolyglotGauge() { Read = jgm => jgm->BlackMage.PolyglotStacks, Write = (jgm, v) => jgm->BlackMage.PolyglotStacks = (byte)v, Max = 3 };
     private static readonly ResourceGauge PldOath = new() { Read = jgm => jgm->Paladin.OathGauge, Write = (jgm, v) => jgm->Paladin.OathGauge = (byte)v, Max = 100 };
 
+    private sealed class PolyglotGauge : ResourceGauge
+    {
+        public override void Add(JobGaugeManager* jgm, int amount)
+        {
+            ref var gauge = ref jgm->BlackMage;
+            if (amount > 0 && gauge.ElementStance == 0) return;
+            var level = Plugin.ObjectTable.LocalPlayer?.Level ?? 0;
+            var cap = level >= 98 ? 3 : level >= 80 ? 2 : 1;
+            gauge.PolyglotStacks = (byte)Math.Clamp(gauge.PolyglotStacks + amount, 0, cap);
+        }
+    }
+
     // Gauges with time-based behavior, ticked by TimedGaugeHandler.
+    internal static readonly TimedGauge BlackMagePolyglotTimer = new(JobId.BlackMage, BlmPolyglot, 30f, decay: false,
+        writeTimer: (jgm, v) => jgm->BlackMage.EnochianTimer = (short)v,
+        isActive: jgm => jgm->BlackMage.EnochianActive && jgm->BlackMage.ElementStance != 0
+            && (Plugin.ObjectTable.LocalPlayer?.Level ?? 0) >= 70,
+        continueAtCap: true, countdown: true, useScenarioTime: true);
+
     public static readonly TimedGauge[] TimedGauges =
     [
         new(JobId.WhiteMage, WhmLily, 20f, decay: false, writeTimer: (jgm, v) => jgm->WhiteMage.LilyTimer = (short)v),        // Healing Lily: +1 every 20s
+        BlackMagePolyglotTimer,
         new(JobId.Sage, SgeAddersgall, 20f, decay: false, writeTimer: (jgm, v) => jgm->Sage.AddersgallTimer = (short)v), // Addersgall: +1 every 20s
         new(JobId.Gunbreaker, GnbComboStep, 30f, decay: true),    // Gnashing Fang combo: resets to 0 after 30s (no visual timer field)
         new(JobId.Paladin, PldConfiteorStep, 30f, decay: true), // Confiteor route: safety reset if abandoned mid-combo
         new(JobId.DarkKnight, DrkDeliriumStep, 30f, decay: true),  // Scarlet Delirium route: safety reset if abandoned mid-combo
-        new(JobId.BlackMage, BlmPolyglot, 30f, decay: false),     // Polyglot: +1/30s (real gen needs active Enochian; approximated as always-on in-sim)
     ];
 
     private static readonly Dictionary<uint, IActionEffect[]> Actions = new()
@@ -277,6 +296,11 @@ internal static unsafe class JobActions
         // Tank role
         [7531] = [Status(1191, 20f)],   // Rampart
         [7535] = [EnemyStatus(1193, 15f)],   // Reprisal
+
+        // Caster and healer role
+        [7559] = [Status(Mitigation.SurecastStatusId, 6f)], // Surecast
+        [7562] = [Status(LucidDreamingStatusId, 21f)],     // Lucid Dreaming
+        [7560] = [new AddleEffect()],
 
         // Tank LB3
         [199]   = [TargetStatus(196, 8f)],    // Last Bastion
@@ -545,11 +569,8 @@ internal static unsafe class JobActions
         [3559]  = [Status(2216, 45f)],                    // the Wanderer's Minuet
 
         // BLM
-        [141]  = [Random(0.4f, Status(165, 30f)), Status(3870, 30f)],   // Fire → Firestarter (40%) + Thunderhead (stance entry)
-        [3573] = [Status(737, 20f)],   // Ley Lines
-        [158]  = [Status(3870, 30f)],  // Manafont → Thunderhead
-        [142]  = [Status(3870, 30f)], [149]  = [Status(3870, 30f)], [152] = [Status(3870, 30f)], [154] = [Status(3870, 30f)], // Blizzard / Transpose / Fire III / Blizzard III → Thunderhead (stance entry)
-        [25796] = [Gauge(BlmPolyglot, 1)],  // Amplifier → +1 Polyglot (spent by Foul/Xenoglossy via CostGauges)
+        [25796] = [Gauge(BlmPolyglot, 1)], // Amplifier
+        [157] = [Status(168, 20f)],    // Manaward
 
         // SMN
         [25801] = [Status(2703, 20f), Status(3873, 30f)],  // Searing Light + Ruby's Glimmer
@@ -693,6 +714,8 @@ internal static unsafe class JobActions
         [110]  = [AnyWeaponskill()],   // Perfect Balance: one stack per weaponskill
         [3688] = [AnyGcd()],           // Hyperphantasia: one stack per pictomancy GCD
     };
+
+    internal const ushort LucidDreamingStatusId = 1204;
 
     public static bool Knows(uint actionId) => Actions.ContainsKey(actionId);
 

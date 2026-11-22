@@ -100,6 +100,8 @@ public interface IBattleCharaProxy
 
     ushort GetTetherId(byte slot);
 
+    void PlayActorVfx(string path, bool nativeScale) { }
+
     // Frees the slot; the local player's proxy ignores it.
     void Despawn();
 

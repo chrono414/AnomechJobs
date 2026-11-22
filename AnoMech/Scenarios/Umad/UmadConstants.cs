@@ -235,6 +235,18 @@ public static class UmadConstants
         public const uint FloodTelegraph               = 0xC183U; // P5 Flood line telegraph, rect 40x10, 1.5s cast, Omen=464
         public const uint FloodAOE                     = 0xC269U; // P5 Flood line resolve, rect 40x10, instant
         public const uint ChaoticFlood                 = 0xBB4FU; // P5 Flood stack call, circle r=6, centered on caster, instant
+        public const uint UltimaRepeater               = 0xBB40U;
+        public const uint UltimaRepeaterHit            = 0xBB41U;
+        public const uint FellForcesCue                = 0xC652U;
+        public const uint FellForcesDps                = 0xC655U;
+        public const uint FellForcesTank               = 0xC653U;
+        public const uint FellForcesHealer             = 0xC654U;
+        public const uint MaddeningOrchestra           = 0xBB50U;
+        public const uint Flare                        = 0xBB52U;
+        public const uint ChaoticFlare                 = 0xBB53U;
+        public const uint Holy                         = 0xBB54U;
+        public const uint FlareDiffusion               = 0xBB55U;
+        public const uint ChaoticHoly                  = 0xBB56U;
         public const uint BlackSpark                   = 0xBCCDU; // single-target, instant
         public const uint GravenImage                  = 0xBCF2U;
         public const uint WhiteHole                    = 0xBD66U; // circle r=80, cast 5.0s
@@ -323,6 +335,8 @@ public static class UmadConstants
         public const ushort ForkedLightning           = (ushort)0x15A8;
         public const ushort CompressedWater           = (ushort)0x15A9;
         public const ushort AccelerationBomb          = (ushort)0x15AA;
+        public const ushort SurpriseFlare             = 0x14E6;
+        public const ushort SurpriseHoly              = 0x14E7;
         public const ushort Entropy                   = (ushort)0x15AB;
         public const ushort DynamicFluid              = (ushort)0x15AC;
     }
@@ -364,6 +378,16 @@ public static class UmadConstants
         public const uint ForsakenStack   = 715;
         public const uint ForsakenChariot = 716;
         public const uint ForsakenCone    = 717;
+    }
+
+    public static class VfxPath
+    {
+
+        private const string OrchestraPrefix = "vfx/monster/gimmick6/eff/z3oy_b0_";
+        public const string OrchestraFlare = OrchestraPrefix + "g24c0c.avfx";
+        public const string OrchestraChaoticFlare = OrchestraPrefix + "g25c0c.avfx";
+        public const string OrchestraHoly = OrchestraPrefix + "g26c0c.avfx";
+        public const string OrchestraFlareDiffusion = OrchestraPrefix + "g27c0c.avfx";
     }
 
     public static class Geometry

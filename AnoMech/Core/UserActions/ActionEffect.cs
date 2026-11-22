@@ -62,11 +62,10 @@ internal sealed class StatusEffect(ushort statusId, float duration, int stacks =
 }
 
 // A peer runs no scenario logic: the host decides who lives, from the statuses on its own copy
-// of each character. Only mitigation, the one kind of status the host acts on, and Sprint, which
-// every other client shows, are sent.
+// of each character. Send statuses the host uses for survival or movement, plus visible Sprint.
 internal static class HostReport
 {
-    public static bool IsReported(ushort statusId) => Mitigation.ByStatusId.ContainsKey(statusId) || statusId == SprintHandler.SprintStatusId;
+    public static bool IsReported(ushort statusId) => Mitigation.ByStatusId.ContainsKey(statusId) || statusId is SprintHandler.SprintStatusId or Mitigation.SurecastStatusId;
 
     public static void RoleStatus(IReadOnlyList<PartyRole> roles, ushort statusId, float duration, int stacks)
     {
@@ -91,7 +90,16 @@ internal sealed class TargetStatusEffect(ushort statusId, float duration, int st
     }
 }
 
-// Leaf: debuff the enemies the action hits (Reprisal).
+internal sealed class AddleEffect : IActionEffect
+{
+    private static readonly EnemyStatusEffect Normal = new(Mitigation.AddleStatusId, 10f);
+    private static readonly EnemyStatusEffect Enhanced = new(Mitigation.AddleStatusId, 15f);
+
+    public void Apply(ActionContext ctx)
+        => (ctx.CasterIsPlayer && (Plugin.ObjectTable.LocalPlayer?.Level ?? 0) >= 98 ? Enhanced : Normal).Apply(ctx);
+}
+
+// Leaf: debuff the enemies the action hits (Reprisal, Addle).
 internal sealed class EnemyStatusEffect(ushort statusId, float duration, int stacks = 0) : IActionEffect
 {
     public void Apply(ActionContext ctx)

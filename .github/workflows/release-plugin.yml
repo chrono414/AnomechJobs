@@ -1,27 +1,46 @@
-name: Release plugin
+name: Release AnomechJobs
 
 on:
   workflow_dispatch:
-    inputs:
-      version_bump:
-        description: Which version segment to bump
-        type: choice
-        default: patch
-        options:
-          - major
-          - minor
-          - patch
-          - revision
 
 permissions:
-  contents: write          # lets the reusable workflow create the release + push the bump commit
+  contents: read
+
+concurrency:
+  group: anomechjobs-release
+  cancel-in-progress: false
 
 jobs:
-  build:
-    uses: anomek/MyDalamudPlugins/.github/workflows/build-plugin.yml@master
-    with:
-      internal_name: AnoMech
-      solution_name: AnoMech
-      version_bump: ${{ inputs.version_bump }}
-    secrets:
-      PAT: ${{ secrets.PAT }}
+  release:
+    if: github.ref_name == github.event.repository.default_branch && github.ref_type == 'branch'
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    env:
+      RELEASE_BRANCH: ${{ github.event.repository.default_branch }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download stable Dalamud
+        run: |
+          $download = Join-Path $env:RUNNER_TEMP Dalamud.zip
+          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile $download -MaximumRetryCount 3
+          Expand-Archive $download "$env:AppData\XIVLauncher\addon\Hooks\dev" -Force
+
+      - name: Build Release package and run tests
+        run: |
+          dotnet build AnoMech.sln -c Release -p:Platform=x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet test AnoMech.sln -c Release -p:Platform=x64 --no-build --logger GitHubActions
+
+      - name: Publish release and update Dalamud feed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./tools/Publish-PluginRelease.ps1

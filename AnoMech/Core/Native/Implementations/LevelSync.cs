@@ -55,19 +55,19 @@ internal sealed unsafe class LevelSync
         if (ilvlSync != 0)
         {
             Plugin.Log.Debug($"Setting up iLvl sync to {ilvlSync}");
-            savedStats = ReadPlayerStats();
+            savedStats = PlayerStats.Read();
             statsSynced = true;
 
             var stats = savedStats;
             foreach (var (baseParamId, value) in GetSyncedAttributes(cfcLevelSync, ilvlSync))
             {
-                if (PacketIndex((uint)baseParamId) is { } index)
+                if (PlayerStats.PacketIndex((uint)baseParamId) is { } index)
                 {
                     stats.Attributes[index] = value;
                 }
             }
 
-            PacketDispatcherPointers.HandlePlayerStatsPacket(0, &stats);
+            PlayerStats.Submit(stats);
         }
     }
 
@@ -92,7 +92,7 @@ internal sealed unsafe class LevelSync
         if (statsSynced)
         {
             var stats = savedStats;
-            PacketDispatcherPointers.HandlePlayerStatsPacket(0, &stats);
+            PlayerStats.Submit(stats);
             statsSynced = false;
         }
     }
@@ -127,35 +127,6 @@ internal sealed unsafe class LevelSync
         }
 
         PacketDispatcherPointers.HandleStatusEffectListDoublePacket(player->EntityId, &packet, 0);
-    }
-
-    private static PlayerStatsPacket ReadPlayerStats()
-    {
-        var packet = new PlayerStatsPacket();
-        var playerState = &UIState.Instance()->PlayerState;
-
-        foreach (var row in Plugin.DataManager.GetExcelSheet<BaseParam>())
-        {
-            if (row.RowId < playerState->Attributes.Length && PacketIndex(row.RowId) is { } index)
-            {
-                packet.Attributes[index] = playerState->Attributes[(int)row.RowId];
-            }
-        }
-
-        var baseStats = &playerState->BaseStrength;
-        for (var i = 0; i < PlayerStatsPacket.BaseStatsCapacity; i++)
-        {
-            packet.BaseStats[i] = baseStats[i];
-        }
-
-        return packet;
-    }
-
-    private static int? PacketIndex(uint baseParamId)
-    {
-        if (!Plugin.DataManager.GetExcelSheet<BaseParam>().TryGetRow(baseParamId, out var row)) return null;
-        int index = row.PacketIndex;
-        return index is >= 0 and < PlayerStatsPacket.AttributesCapacity ? index : null;
     }
 
     private static Dictionary<int, int> GetSyncedAttributes(byte level, ushort ilvl)

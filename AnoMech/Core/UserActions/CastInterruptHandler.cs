@@ -25,7 +25,14 @@ internal sealed unsafe class CastInterruptHandler : IUserActionHandler
         var remaining = player->CastInfo.TotalCastTime - player->CastInfo.CurrentCastTime;
         if (remaining <= Plugin.Config.CastInterruptThreshold) return;
 
-        if (hooks.MovementInputActive || hooks.IsJumping || cancelRequested)
-            localPlayer.CancelCast(player->CastInfo.ActionId, CastCancelReason.SelfCancelled);
+        var moving = hooks.MovementInputActive;
+        var jumping = hooks.IsJumping;
+        if (!moving && !jumping && !cancelRequested) return;
+
+#if DEBUG
+        DiagnosticLog.Info($"[CastTiming] Sim cancelled {player->CastInfo.ActionId} with {remaining:F3}s left " +
+            $"(movement input={moving}, jump={jumping}, cancel button={cancelRequested}).");
+#endif
+        localPlayer.CancelCast(player->CastInfo.ActionId, CastCancelReason.SelfCancelled);
     }
 }

@@ -11,7 +11,11 @@ namespace AnoMech.Core.UserActions;
 // Both are server-driven in the real game (the ActorGauge packet the sim firewalls), so we
 // run them here and send the ActorGauge ourselves. `writeTimer` (optional) is the gauge's own countdown field
 // (WhiteMage.LilyTimer, Sage.AddersgallTimer) — the visible fill ring; kept in sync as ms.
-internal sealed unsafe class TimedGauge(JobId job, ResourceGauge gauge, float seconds, bool decay, int amount = 1, GaugeWriter? writeTimer = null)
+internal unsafe delegate bool GaugeCondition(JobGaugeManager* jgm);
+
+internal sealed unsafe class TimedGauge(JobId job, ResourceGauge gauge, float seconds, bool decay, int amount = 1,
+    GaugeWriter? writeTimer = null, GaugeCondition? isActive = null, bool continueAtCap = false,
+    bool countdown = false, bool useScenarioTime = false)
 {
     public JobId Job => job;
     public ResourceGauge Gauge => gauge;
@@ -19,12 +23,32 @@ internal sealed unsafe class TimedGauge(JobId job, ResourceGauge gauge, float se
     public bool Decay => decay;
     public int Amount => amount;
     public GaugeWriter? WriteTimer => writeTimer;
+    public GaugeCondition? IsActive => isActive;
+    public bool ContinueAtCap => continueAtCap;
+    public bool Countdown => countdown;
+    public bool UseScenarioTime => useScenarioTime;
 }
 
 internal sealed unsafe class TimedGaugeHandler : IUserActionHandler
 {
     private sealed class Tracker { public float Timer; public int LastValue = -1; }
     private readonly Dictionary<TimedGauge, Tracker> trackers = new();
+
+    public void OnScenarioStart() => ResetScenarioTrackers();
+    public void OnSessionEnd() => ResetScenarioTrackers();
+
+    internal void Seed(TimedGauge gauge, JobGaugeManager* jgm, float elapsed)
+    {
+        var tracker = new Tracker();
+        TickRegen(gauge, ref tracker.Timer, jgm, elapsed);
+        trackers[gauge] = tracker;
+    }
+
+    private void ResetScenarioTrackers()
+    {
+        foreach (var gauge in JobActions.TimedGauges)
+            if (gauge.UseScenarioTime) trackers.Remove(gauge);
+    }
 
     public void OnTick(float deltaSeconds)
     {
@@ -38,21 +62,33 @@ internal sealed unsafe class TimedGaugeHandler : IUserActionHandler
             if (tg.Job != job) continue;
             if (!trackers.TryGetValue(tg, out var tr)) trackers[tg] = tr = new Tracker();
             if (tg.Decay) TickDecay(tg, tr, jgm, deltaSeconds);
-            else TickRegen(tg, tr, jgm, deltaSeconds);
+            else
+            {
+                var dt = deltaSeconds;
+                if (tg.UseScenarioTime && Plugin.Game is { } game)
+                    dt = game.SimulationDelta(deltaSeconds);
+                TickRegen(tg, ref tr.Timer, jgm, dt);
+            }
         }
     }
 
-    private static void TickRegen(TimedGauge tg, Tracker tr, JobGaugeManager* jgm, float dt)
+    internal static void TickRegen(TimedGauge tg, ref float timer, JobGaugeManager* jgm, float dt)
     {
-        if (tg.Gauge.Read(jgm) >= tg.Gauge.Max)   // full — the fill pauses (empty ring)
+        if (tg.IsActive?.Invoke(jgm) == false || (!tg.ContinueAtCap && tg.Gauge.Read(jgm) >= tg.Gauge.Max))
         {
-            tr.Timer = 0f;
+            timer = 0f;
             tg.WriteTimer?.Invoke(jgm, 0);
             return;
         }
-        tr.Timer += dt;
-        if (tr.Timer >= tg.Seconds) { tr.Timer -= tg.Seconds; tg.Gauge.Add(jgm, tg.Amount); }
-        tg.WriteTimer?.Invoke(jgm, (int)(tr.Timer * 1000f));   // elapsed ms toward the next tick
+        timer += dt;
+        while (timer >= tg.Seconds)
+        {
+            timer -= tg.Seconds;
+            tg.Gauge.Add(jgm, tg.Amount);
+            if (!tg.ContinueAtCap) break;
+        }
+        var displayed = tg.Countdown ? tg.Seconds - timer : timer;
+        tg.WriteTimer?.Invoke(jgm, (int)(displayed * 1000f));
     }
 
     private static void TickDecay(TimedGauge tg, Tracker tr, JobGaugeManager* jgm, float dt)

@@ -22,7 +22,7 @@ namespace AnoMech.Core.Native.Implementations;
 // ActionManagerEx.cs (which credit awgil's vnavmesh + bossmod).
 public sealed unsafe class LocalPlayerInputHooks : ILocalPlayerInput
 {
-    public event Action<ActionType, uint, ulong>? ActionExecuted;
+    public event Action<LocalActionExecution>? ActionExecuted;
 
     // --- Player activity signals (read by SimPlayer to drive Party.Player.IsMoving/IsActing) ---
     // The engine's own per-frame movement sample (the signal bossmod reads): input intent, not a
@@ -246,7 +246,16 @@ public sealed unsafe class LocalPlayerInputHooks : ILocalPlayerInput
 
     private void UpdateDetour(ActionManager* self)
     {
+#if DEBUG
+        var before = self->ActionQueued && PlayerActionTrace.Active ? PlayerActionTrace.Snapshot(self) : null;
+        var sequence = self->LastUsedActionSequence;
+        var queued = self->QueuedActionId;
+#endif
         updateHook.Original(self);
+#if DEBUG
+        if (before != null && (!self->ActionQueued || sequence != self->LastUsedActionSequence || queued != self->QueuedActionId))
+            PlayerActionTrace.Write($"Queue update before [{before}] after [{PlayerActionTrace.Snapshot(self)}]");
+#endif
         ScanAndLogActiveStatuses();
     }
 
@@ -256,11 +265,22 @@ public sealed unsafe class LocalPlayerInputHooks : ILocalPlayerInput
         // The hotbar presses the button's own id; what runs is what the button is adjusted to, which
         // the action itself can change (enchanted melee spending the mana its swap depends on).
         var ran = actionType == ActionType.Action ? self->GetAdjustedActionId(actionId) : actionId;
+#if DEBUG
+        var before = PlayerActionTrace.Active && actionType == ActionType.Action ? PlayerActionTrace.Snapshot(self) : null;
+#endif
+        var beforeSequence = self->LastUsedActionSequence;
         var result = useActionHook.Original(self, actionType, actionId, targetId, extraParam, mode, comboRouteId, outOptAreaTargeted);
+        var afterSequence = self->LastUsedActionSequence;
+#if DEBUG
+        if (before != null)
+            PlayerActionTrace.Write($"UseAction raw={actionId} adjusted={ran} mode={mode} accepted={result} before [{before}] after [{PlayerActionTrace.Snapshot(self)}]");
+#endif
         if (result)
         {
             actionUsedSincePoll = true;
-            ActionExecuted?.Invoke(actionType, ran, targetId);
+            // A successful press may only have added an entry to the queue.
+            if (afterSequence != beforeSequence)
+                ActionExecuted?.Invoke(new LocalActionExecution(actionType, ran, targetId, null, afterSequence));
         }
         return result;
     }
@@ -268,11 +288,22 @@ public sealed unsafe class LocalPlayerInputHooks : ILocalPlayerInput
     private bool UseActionLocationDetour(ActionManager* self, ActionType actionType, uint actionId, ulong targetId, Vector3* location, uint extraParam, byte a7)
     {
         var ran = actionType == ActionType.Action ? self->GetAdjustedActionId(actionId) : actionId;
+        Vector3? executedLocation = location == null ? null : *location;
+#if DEBUG
+        var before = PlayerActionTrace.Active && actionType == ActionType.Action ? PlayerActionTrace.Snapshot(self) : null;
+#endif
+        var beforeSequence = self->LastUsedActionSequence;
         var result = useActionLocationHook.Original(self, actionType, actionId, targetId, location, extraParam, a7);
+        var afterSequence = self->LastUsedActionSequence;
+#if DEBUG
+        if (before != null)
+            PlayerActionTrace.Write($"UseActionLocation raw={actionId} adjusted={ran} accepted={result} before [{before}] after [{PlayerActionTrace.Snapshot(self)}]");
+#endif
         if (result)
         {
             actionUsedSincePoll = true;
-            ActionExecuted?.Invoke(actionType, ran, targetId);
+            if (afterSequence != beforeSequence)
+                ActionExecuted?.Invoke(new LocalActionExecution(actionType, ran, targetId, executedLocation, afterSequence));
         }
         return result;
     }

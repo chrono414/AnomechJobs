@@ -11,10 +11,12 @@ inn, drives their casts and movement, and renders the real VFX, cast bars, tethe
 
 ## Build / run
 
-- Build: `dotnet build` from the repo root. The Dalamud SDK resolves from
-  `%AppData%/XIVLauncher/addon/Hooks/dev/`.
+- Build the plugin from the repo root with `dotnet build AnoMech/AnoMech.csproj -c Debug -p:Platform=x64`.
+  Always pass `-p:Platform=x64` for plugin builds so output goes under `AnoMech/bin/x64/`.
+  `AnoMech/bin/x64/Debug/` is the only local Debug build output and load location.
+  The Dalamud SDK resolves from `%AppData%/XIVLauncher/addon/Hooks/dev/`.
 - The plugin can't run standalone: it only runs inside the game, loaded by Dalamud.
-- For a local Debug build, load `C:\AnomechRotation\AnomechJobs\AnoMech\bin\x64\Debug\AnoMech.dll` in Dalamud. Keep the matching manifest and dependencies alongside it.
+- For a local Debug build, load `C:\AnomechRotation\AnomechJobs\AnoMech\bin\x64\Debug\AnomechJobs.dll` in Dalamud. Keep the matching manifest and dependencies alongside it.
 
 ## Tests
 

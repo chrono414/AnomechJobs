@@ -1,5 +1,8 @@
 using Dalamud.Configuration;
 using System;
+using System.Collections.Generic;
+using AnoMech.Core.UserActions;
+using AnoMech.Core.UserActions.Jobs;
 using AnoMech.Multiplayer;
 using AnoMech.Network;
 
@@ -9,6 +12,8 @@ namespace AnoMech;
 public class Configuration : IPluginConfiguration
 {
     public int Version { get; set; } = 0;
+
+    public Dictionary<int, StartingStatePresets<BlackMageStartingState>> BlackMageStartingPresets { get; set; } = [];
 
     
     public bool OpenSimMenuOnInn { get; set; } = true;

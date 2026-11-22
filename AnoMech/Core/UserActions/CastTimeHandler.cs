@@ -15,7 +15,7 @@ namespace AnoMech.Core.UserActions;
 //    spells, weaponskills, items, Sprint, etc. all waste it. The one exception is a cast-time spell
 //    that Acceleration reduces to instant — then Acceleration is consumed and Dualcast is preserved.
 //    (Odd, but this is how the game behaves.)
-//  - Acceleration / Firestarter / Thunderhead — granted+consumed by the JobActions table.
+//  - JobActions clears spell-specific enablers. Black Mage grants its own procs.
 //
 // A press is handled when it happens: OnCastStart for a hard cast, OnAction for an instant one.
 // Dualcast is granted when a genuine RDM hard cast resolves, so never for an interrupted one. Runs
@@ -31,6 +31,7 @@ internal sealed class CastTimeHandler : IUserActionHandler
     private bool castGrantsDualcast;
 
     public void OnScenarioStart() => castAction = 0;
+    public void OnSessionEnd() => castAction = 0;
 
     public void OnCastStart(ActionType actionType, uint actionId)
     {
@@ -44,9 +45,12 @@ internal sealed class CastTimeHandler : IUserActionHandler
         => actionType == ActionType.Action && Plugin.Game?.Player is { } player && player.HasStatus(DualcastStatus)
            && IsCastTimeSpell(actionId) ? 0 : null;
 
+    private static bool IsInstantByTrait(uint actionId)
+        => actionId is Foul or 16505 && (Plugin.ObjectTable.LocalPlayer?.Level ?? 0) >= (actionId == Foul ? 80 : 100);
+
     private static bool IsCastTimeSpell(uint actionId)
         => Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Action>().TryGetRow(actionId, out var row)
-           && row.ActionCategory.RowId == 2 && row.Cast100ms > 0 && actionId != Foul;
+           && row.ActionCategory.RowId == 2 && row.Cast100ms > 0 && !IsInstantByTrait(actionId);
 
     public void OnAction(ActionType actionType, uint actionId)
     {
@@ -84,7 +88,7 @@ internal sealed class CastTimeHandler : IUserActionHandler
             {
                 var cat = row.ActionCategory.RowId;
                 isAbility = cat == 4;
-                isCastTimeSpell = cat == 2 && row.Cast100ms > 0 && actionId != Foul;
+                isCastTimeSpell = cat == 2 && row.Cast100ms > 0 && !IsInstantByTrait(actionId);
             }
         }
         bool accelReduced = isCastTimeSpell && player.HasStatus(Acceleration) && actionId is 25855 or 25856 or 16526;
@@ -101,8 +105,8 @@ internal sealed class CastTimeHandler : IUserActionHandler
         // the priority, and a spell-specific status (Acceleration/Firestarter/Thunderhead) already took it.
         if (isCastTimeSpell && !dualcastConsumed && !SpellSpecific(player, actionId))
         {
-            if (player.HasStatus(TriplecastStatus)) player.AddStatus(TriplecastStatus, 0f, -1);
-            else if (player.HasStatus(SwiftcastStatus)) player.RemoveStatus(SwiftcastStatus);
+            if (player.HasStatus(SwiftcastStatus)) player.RemoveStatus(SwiftcastStatus);
+            else if (player.HasStatus(TriplecastStatus)) player.AddStatus(TriplecastStatus, 0f, -1);
         }
 
         return isCastTimeSpell && !dualcastConsumed && PlayerJob.Current == JobId.RedMage;

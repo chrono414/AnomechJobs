@@ -2,7 +2,7 @@
 
 How completely the `UserActions` module resolves each job's **client-observable, non-damage**
 behaviour (job gauges, status grants/procs, combo advancement, button swaps, cast interrupts).
-Damage, healing, and mitigation numbers are out of scope by design.
+Outgoing player damage and healing numbers are out of scope. Some defensive statuses feed the sim's incoming-hit survival check.
 
 Two layers resolve a player's own actions client-side:
 - **Data table** (`JobActions.cs`) — per-action scalar gauge writes, status grants, linear-combo
@@ -22,7 +22,7 @@ doesn't work. Marks: ✅ works · ⚠️ partial · ❌ not simulated · ➖ not
 |-----|----------------|
 | DRG | none (fully simulated) |
 | GNB | Bloodfest temporary cartridge cap→6 not modelled (cosmetic) |
-| BLM | Paradox's Firestarter grant |
+| BLM | See BLM.md for native gauge, cast and movement verification |
 | DNC | Improvisation → Rising Rhythm status |
 | PCT | Rainbow Bright never granted |
 | SMN | Arcanum (Ifrit/Titan/Garuda-Ready) summon-select bits |
@@ -54,8 +54,7 @@ doesn't work. Marks: ✅ works · ⚠️ partial · ❌ not simulated · ➖ not
   Swiftcast. **RDM Dualcast** is granted (on cast completion) and consumed like the others, but the
   client ignores a granted Dualcast status for cast time, so `CastTimeHandler` answers the client's
   cast-time query (`GetAdjustedCastTime`) with 0 for the next spell itself. Duration cast-time
-  reductions (Ley Lines, Lightspeed, Presence of Mind, PCT Inspiration) are granted in the data table
-  and applied by the client.
+  reductions use native statuses. Black Mage's Circle of Power follows the player’s position relative to Ley Lines.
 - **Healer utility gates** — SGE Eukrasia gauge byte: a swap/gate chain whose defining gauge isn't set.
   (SCH Seraphism, WHM Divine Caress, and AST Neutral Sect / Earthly Star / Macrocosmos are now wired.)
 - **NIN mudras are tracked by the plugin** — the native Ten/Chi/Jin → Ninjutsu selector reads an
@@ -63,5 +62,5 @@ doesn't work. Marks: ✅ works · ⚠️ partial · ❌ not simulated · ➖ not
   sequence and answers the client's action-id query (`GetAdjustedActionId`) with the jutsu.
 - **Handler gauge encodings unverified in-game** — the state handlers write documented CS fields, but
   the exact packed-bit/enum constants the game's `GetAdjustedActionId` reads can't be confirmed without
-  running the client (SMN attunement type codes, AST card sets, BLM stance transitions/Paradox arm,
+  running the client (SMN attunement type codes, AST card sets, BLM Polyglot timer and hotbar gates,
   MNK blitz window, VPR `SerpentComboState` layout, PCT creature-cycle, DNC step-array HUD write).

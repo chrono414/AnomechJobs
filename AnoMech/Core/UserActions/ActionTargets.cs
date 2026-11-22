@@ -7,7 +7,7 @@ using AnoMech.Core.SimObjects;
 namespace AnoMech.Core.UserActions;
 
 // Who a player action lands on, read from the Action sheet: its single target, or a circle of
-// EffectRange around the caster. The sheet does not say which side an action affects
+// EffectRange around the caster or the executed target. The sheet does not say which side an action affects
 // (Reprisal and Heart of Light differ only in radius), so the caller picks Friendly or Hostile.
 internal static class ActionTargets
 {
@@ -30,19 +30,22 @@ internal static class ActionTargets
     }
 
     public static IReadOnlyList<SimEnemy> Hostile(ActionContext ctx)
+        => Hostile(ctx.ActionId, ctx.TargetId, ctx.Caster, targetCentered: false);
+
+    public static IReadOnlyList<SimEnemy> Hostile(uint actionId, ulong targetId, SimCharacter caster, bool targetCentered)
     {
-        if (Plugin.Game is not { } game || !TryGetAction(ctx.ActionId, out var action)) return [];
+        if (Plugin.Game is not { } game || !TryGetAction(actionId, out var action)) return [];
         var enemies = game.World.Children.OfType<SimEnemy>().Where(e => e.IsActive);
-        switch (action.CastType)
+        var target = targetCentered ? enemies.FirstOrDefault(e => e.Targetable && (ulong)e.GameObjectId == targetId) : null;
+        if (targetCentered && target == null) return [];
+
+        return action.CastType switch
         {
-            case CastType.SingleTarget:
-                return enemies.Where(e => (ulong)e.GameObjectId == ctx.TargetId).ToList();
-            case CastType.Circle:
-                return enemies.Where(e => InRange(ctx.Caster, e, action.EffectRange)).ToList();
-            default:
-                Plugin.Log.Warning($"ActionTargets: action {ctx.ActionId} has unsupported CastType {action.CastType}; no enemy hit");
-                return [];
-        }
+            CastType.SingleTarget => enemies.Where(e => (ulong)e.GameObjectId == targetId).ToList(),
+            CastType.Circle or CastType.Circle2 => enemies.Where(e => (!targetCentered || e.Targetable)
+                && InRange(target ?? caster, e, action.EffectRange)).ToList(),
+            _ => [],
+        };
     }
 
     private static bool TryGetAction(uint actionId, [NotNullWhen(true)] out ActionRow? action)

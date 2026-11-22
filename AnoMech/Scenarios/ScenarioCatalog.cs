@@ -22,6 +22,8 @@ using AnoMech.Scenarios.Umad.P3LimitCut;
 using AnoMech.Scenarios.Umad.P4KefkaSays;
 using AnoMech.Scenarios.Umad.P5Celestriad;
 using AnoMech.Scenarios.Umad.P5Exaflares;
+using AnoMech.Scenarios.Umad.P5Full;
+using AnoMech.Scenarios.Umad.P5Maddening;
 using AnoMech.Scenarios.Umad.P5Flood;
 using AnoMech.Scenarios.Uwu.UltimatePredation;
 using AnoMech.Scenarios.Uwu.UltimateSuppression;
@@ -79,6 +81,8 @@ public sealed class ScenarioCatalog
         new UmadP5FloodScenario(),
         new UmadP5CelestriadScenario(),
         new UmadP5ExaflaresScenario(),
+        new UmadP5MaddeningScenario(),
+        new UmadP5FullScenario(),
         new UmadP5ForsakenNull(),
         new FruP2DiamondDustScenario(),
         new FruP2LightRampantScenario(),

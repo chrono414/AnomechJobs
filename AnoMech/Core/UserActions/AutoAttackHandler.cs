@@ -13,7 +13,7 @@ namespace AnoMech.Core.UserActions;
 // The client only flips the auto-attack flag; the swings are server ActionEffects on the
 // server's own weapon-delay timer, which the sim firewall blocks. This runs that timer and
 // replays each swing at the player's target. Animation only: no damage, no flytext.
-internal sealed unsafe class AutoAttackHandler : IUserActionHandler
+internal sealed unsafe class AutoAttackHandler(HasteHandler haste) : IUserActionHandler
 {
     public const uint AttackActionId = 7;
     public const uint ShotActionId = 8;
@@ -56,7 +56,7 @@ internal sealed unsafe class AutoAttackHandler : IUserActionHandler
         if (!InReach(player, enemy, ReachOf(job))) return;
 
         var actionId = ActionIdOf(job);
-        swingCooldown = WeaponDelay();
+        swingCooldown = haste.AutoAttackDelay ?? WeaponDelay();
         Swing(actionId, enemy);
         Swung?.Invoke(actionId, (ulong)enemy.GameObjectId);
         JobActions.ApplyAutoAttack(game.Player, actionId, enemy.GameObjectId, rng);

@@ -10,14 +10,14 @@ namespace AnoMech.Core.EnemyActions;
 internal static class DamageCheck
 {
     // Null when the hit is survivable, otherwise why it kills ("" when it simply does).
-    public static string? LethalCause(SimCharacter target, VulnSpec spec, Severity severity, DamageKind kind, SimParty party)
+    public static string? LethalCause(SimCharacter target, VulnSpec spec, Severity severity, DamageKind kind, SimParty party, SimCharacter caster)
     {
         if (spec.Protections.Any(id => target.FindStatus(id) != null)) return null;
         if (severity.Kind == SeverityKind.Lethal) return MissingProtection(spec) ?? "";
         var vuln = CarriedVulnerability(target, spec);
         if (vuln is { RequiredMitigation: null }) return "had vuln up debuff";
         if (severity.Kind == SeverityKind.TankBuster && !IsTank(target)) return "tank buster";
-        if (Survives(target, party, MathF.Max(severity.MinMitigation, vuln?.RequiredMitigation ?? 0f), kind)) return null;
+        if (Survives(target, party, MathF.Max(severity.MinMitigation, vuln?.RequiredMitigation ?? 0f), kind, caster)) return null;
         return vuln != null ? "not enough mitigation for a hit with vuln up" : "not enough mitigation";
     }
 
@@ -37,11 +37,17 @@ internal static class DamageCheck
         return null;
     }
 
-    // Only a human's own statuses are ever checked: a bot always passes. Spends the target's shields.
-    private static bool Survives(SimCharacter target, SimParty party, float requiredMitigation, DamageKind kind)
+    // Bots always pass. A human's check includes attacker debuffs and spends the target's shields.
+    private static bool Survives(SimCharacter target, SimParty party, float requiredMitigation, DamageKind kind, SimCharacter caster)
     {
         if (requiredMitigation <= 0f || !ChecksMitigation(target, party)) return true;
-        var effective = Mitigation.Effective(target.ActiveStatusSnapshot.Select(s => s.StatusId), kind);
+        var addle = caster.HasStatus(Mitigation.AddleStatusId) ? kind switch
+        {
+            DamageKind.Physical => 0.05f,
+            DamageKind.Magic => 0.10f,
+            _ => 0f,
+        } : 0f;
+        var effective = Mitigation.Effective(target.ActiveStatusSnapshot.Select(s => s.StatusId), kind, addle);
         Mitigation.SpendShields(target);
         var survives = effective >= requiredMitigation - 0.0005f;
         DiagnosticLog.Info($"[EnemyAction] Mitigation check: {(target as ISimPartyMember)?.Role} has {effective:P1} {kind}, needs {requiredMitigation:P1} -- {(survives ? "survives" : "dies")}.");
