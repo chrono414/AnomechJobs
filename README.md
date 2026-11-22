@@ -1,6 +1,17 @@
 
 # ![AnomechJobs](images/icon.png) AnomechJobs
 
+Repo link: https://raw.githubusercontent.com/chrono414/AnomechJobs/main/repo.json
+
+This is an alt version of anomech with improvements to the job simulation, as well as a full P5 phase for DMU.
+
+SO far the only additional implementations are:
+- BLM lvl 100 complete rotation and starting states
+- P5 maddening orchestra and a Full P5
+
+
+---------------------------------------
+
 *Another FFXIV mechanics simulator*
 
 ---
