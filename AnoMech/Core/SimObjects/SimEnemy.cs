@@ -75,7 +75,8 @@ public record struct EnemySpawnConfig(
     IReadOnlyList<SpawnStatus>? Statuses = null,
     byte ModelState = 0,
     // ModelScale row; retail sends 0 for most BNpcs.
-    byte ModelScale = 0);
+    byte ModelScale = 0,
+    float? HitboxRadiusOverride = null);
 
 public readonly record struct SpawnStatus(ushort StatusId, ushort Param = 0);
 
@@ -192,6 +193,7 @@ public sealed class SimEnemy : SimNpc
 
     protected override void OnPacketSpawned(IBattleCharaProxy chara)
     {
+        ApplyHitboxOverride();
         var targetableBefore = chara.TargetableStatus;
         if (SpawnConfig.Targetable) // enemies spawn untargettable
             SetTargetable(SpawnConfig.Targetable);
@@ -367,6 +369,13 @@ public sealed class SimEnemy : SimNpc
 
     // Only for DefeatCasterEffect. The enemy dies by its own action (a self-destruct): it goes
     // down as the action lands and plays its death animation once the action's lock ends.
+    protected override bool MarkDead()
+    {
+        if (!base.MarkDead()) return false;
+        Natives.UserActions?.OnEnemyDefeated(this);
+        return true;
+    }
+
     internal void DefeatByOwnAction(EnemyAction action)
     {
         if (Dead) return;
@@ -396,6 +405,7 @@ public sealed class SimEnemy : SimNpc
     public override void Tick(float deltaSeconds)
     {
         base.Tick(deltaSeconds);
+        ApplyHitboxOverride();
         TickTimelineWatch(deltaSeconds);
         TickPacketSpawnCheckpoints();
 
@@ -410,6 +420,14 @@ public sealed class SimEnemy : SimNpc
                 slotCheckDone = true;
             }
         }
+    }
+
+    private void ApplyHitboxOverride()
+    {
+        // Model loading can restore the model's own radius after the actor has spawned.
+        if (SpawnConfig.HitboxRadiusOverride is { } radius && !PacketSpawnPending &&
+            Proxy is { Exists: true } chara && chara.HitboxRadius != radius)
+            chara.SetHitboxRadius(radius);
     }
 
     private void LogModelSlotState(string label)

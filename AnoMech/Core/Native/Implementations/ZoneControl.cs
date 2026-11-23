@@ -191,7 +191,7 @@ public sealed unsafe partial class ZoneControl : IZoneControl
     // Load the target territory, teleport player to playerSpawn, enable firewall. Firewall is
     // enabled before the zone load (matching Hyperborea's sequence). False when the start is
     // refused or the firewall didn't arm; nothing is loaded then.
-    public bool Enter(uint territoryId, Vector3 playerSpawn)
+    public bool Enter(uint territoryId, Vector3 playerSpawn, byte? practiceLevel = null)
     {
         if (StartBlockedReason() is { } blocked)
         {
@@ -217,7 +217,7 @@ public sealed unsafe partial class ZoneControl : IZoneControl
         CaptureInnState();
         try
         {
-            LoadZoneInternal(territoryId, false, playerSpawn);
+            LoadZoneInternal(territoryId, false, playerSpawn, practiceLevel: practiceLevel);
         }
         catch (Exception e)
         {
@@ -593,7 +593,7 @@ public sealed unsafe partial class ZoneControl : IZoneControl
 
     // ── Zone loading sequence (mirrors Hyperborea Utils.LoadZone) ─────────────
 
-    private void LoadZoneInternal(uint territory, bool unloading, Vector3 playerPos, float? rotation = null)
+    private void LoadZoneInternal(uint territory, bool unloading, Vector3 playerPos, float? rotation = null, byte? practiceLevel = null)
     {
         completedLoad = 0;
         var eventFramework = EventFramework.Instance();
@@ -650,7 +650,7 @@ public sealed unsafe partial class ZoneControl : IZoneControl
             loadedInstanceContent = contentId;
             InstanceContentDirectorHelper.SetDutyData(cfc);
 
-            levelSync.Apply(cfc, player, classJobId);
+            levelSync.Apply(cfc, player, classJobId, practiceLevel);
         }
         else
         {

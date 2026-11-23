@@ -48,6 +48,8 @@ internal sealed unsafe class AutoAttackHandler(HasteHandler haste) : IUserAction
         // Stun and death only hold the swing; autos stay on.
         if (Plugin.Game is not { } game || game.Player is not { Dead: false, ActionsLocked: false }) return;
 
+        if (game.Player.HasStatus(Jobs.MachinistStateHandler.Flamethrower) || game.Player.HasStatus(1175)) return;
+
         var player = (BattleChara*)(Plugin.ObjectTable.LocalPlayer?.Address ?? 0);
         if (player == null || player->CastInfo.IsCasting) return;
         if (TargetedEnemy(game) is not { } enemy) return;

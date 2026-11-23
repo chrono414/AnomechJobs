@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using AnoMech.Core.Game.Party;
 using AnoMech.Core.Native.Implementations;
+using AnoMech.Core.Native.Interfaces;
 using AnoMech.Core.SimObjects;
 
 namespace AnoMech.Core.UserActions;
@@ -50,7 +51,7 @@ internal sealed unsafe class SetGaugeEffect(ResourceGauge gauge, int value) : IA
 
 // Leaf: grant a status to the player for `duration` seconds (replaces any existing copy).
 // `stacks` sets Status.Param — 0 for a plain buff, or the stack count for a stacking buff
-// (Requiescat, Sacred Sight); we don't decrement per-consume yet, it just expires.
+// (Requiescat, Sacred Sight) that JobActions consumes when their actions resolve.
 internal sealed class StatusEffect(ushort statusId, float duration, int stacks = 0) : IActionEffect
 {
     public void Apply(ActionContext ctx)
@@ -65,7 +66,7 @@ internal sealed class StatusEffect(ushort statusId, float duration, int stacks =
 // of each character. Send statuses the host uses for survival or movement, plus visible Sprint.
 internal static class HostReport
 {
-    public static bool IsReported(ushort statusId) => Mitigation.ByStatusId.ContainsKey(statusId) || statusId is SprintHandler.SprintStatusId or Mitigation.SurecastStatusId;
+    public static bool IsReported(ushort statusId) => Mitigation.ByStatusId.ContainsKey(statusId) || statusId == SprintHandler.SprintStatusId || Mitigation.IsKnockbackImmunity(statusId);
 
     public static void RoleStatus(IReadOnlyList<PartyRole> roles, ushort statusId, float duration, int stacks)
     {
@@ -75,18 +76,53 @@ internal static class HostReport
 }
 
 // Leaf: grant a status to the action's friendly recipients (see ActionTargets).
-internal sealed class TargetStatusEffect(ushort statusId, float duration, int stacks = 0) : IActionEffect
+internal sealed class TargetStatusEffect(ushort statusId, float duration, int stacks = 0, ushort incompatible = 0, float? radius = null, ushort secondIncompatible = 0) : IActionEffect
 {
     public void Apply(ActionContext ctx)
     {
         var roles = new List<PartyRole>();
-        foreach (var member in ActionTargets.Friendly(ctx))
+        foreach (var member in radius is { } range ? ActionTargets.FriendlyWithin(ctx.Caster, range) : ActionTargets.Friendly(ctx))
         {
+            if (incompatible != 0 && member.HasStatus(incompatible) ||
+                secondIncompatible != 0 && member.HasStatus(secondIncompatible)) continue;
             member.RemoveStatus(statusId);
             member.AddStatusParam(statusId, stacks, duration);
             if (member is ISimPartyMember slot) roles.Add(slot.Role);
         }
         HostReport.RoleStatus(roles, statusId, duration, stacks);
+    }
+}
+
+internal sealed class DamageOverTimeEffect(ushort statusId, float duration, ushort incompatible = 0) : IActionEffect
+{
+    public void Apply(ActionContext ctx)
+    {
+        foreach (var target in ActionTargets.Hostile(ctx))
+        {
+            if (incompatible != 0) target.RemoveStatus(incompatible, ctx.Caster.GameObjectId);
+            target.RemoveStatus(statusId, ctx.Caster.GameObjectId);
+            target.AddStatusParam(statusId, 0, duration, ctx.Caster.GameObjectId);
+        }
+    }
+}
+
+internal sealed class OwnedBarrierEffect(ushort statusId) : IActionEffect
+{
+    public void Apply(ActionContext ctx)
+    {
+        var roles = new List<PartyRole>();
+        foreach (var target in ActionTargets.Friendly(ctx))
+        {
+            var owner = ctx.Caster.GameObjectId;
+            if (statusId == Jobs.SageStateHandler.PrognosisBarrier &&
+                target.FindStatus(Jobs.SageStateHandler.DiagnosisBarrier, owner) != null) continue;
+            if (statusId == Jobs.SageStateHandler.DiagnosisBarrier)
+                target.RemoveStatus(Jobs.SageStateHandler.PrognosisBarrier, owner);
+            target.RemoveStatus(statusId, owner);
+            target.AddStatusParam(statusId, 0, 30f, owner);
+            if (target is ISimPartyMember member) roles.Add(member.Role);
+        }
+        HostReport.RoleStatus(roles, statusId, 30f, 0);
     }
 }
 
@@ -111,6 +147,56 @@ internal sealed class EnemyStatusEffect(ushort statusId, float duration, int sta
             enemy.AddStatusParam(statusId, stacks, duration);
         }
         Plugin.Multiplayer?.ReportAppliedEnemyStatus(enemies, statusId, duration, (ushort)stacks);
+    }
+}
+
+internal sealed class UnlocksEffect(uint actionId, IActionEffect[] inner) : IActionEffect
+{
+    internal static bool IsUnlocked(uint actionId)
+        => Natives.Data.Action(actionId) is { ClassJobLevel: > 0 } action && PlayerJob.Level >= action.ClassJobLevel;
+
+    public void Apply(ActionContext ctx)
+    {
+        if (ctx.CasterIsPlayer && !IsUnlocked(actionId)) return;
+        foreach (var effect in inner) effect.Apply(ctx);
+    }
+}
+
+internal sealed class BelowLevelEffect(int level, IActionEffect effect) : IActionEffect
+{
+    public void Apply(ActionContext ctx)
+    {
+        if (ctx.CasterIsPlayer && PlayerJob.Level < level) effect.Apply(ctx);
+    }
+}
+
+internal sealed class LevelEffect(int level, IActionEffect[] inner) : IActionEffect
+{
+    public void Apply(ActionContext ctx)
+    {
+        if (ctx.CasterIsPlayer && PlayerJob.Level < level) return;
+        foreach (var effect in inner) effect.Apply(ctx);
+    }
+}
+
+internal sealed class StatusExtensionEffect(ushort statusId, float seconds, float max, bool existingOnly) : IActionEffect
+{
+    public void Apply(ActionContext ctx)
+    {
+        var status = ctx.Caster.FindStatus(statusId);
+        if (status == null && existingOnly) return;
+        var remaining = status?.RemainingTime ?? 0f;
+        ctx.Caster.RemoveStatus(statusId);
+        ctx.Caster.AddStatusParam(statusId, 0, Math.Min(remaining + seconds, max));
+    }
+}
+
+internal sealed class RecastReductionEffect(float seconds, uint[] actionIds) : IActionEffect
+{
+    public void Apply(ActionContext ctx)
+    {
+        if (!ctx.CasterIsPlayer || ActionTargets.Hostile(ctx).Count == 0) return;
+        foreach (var actionId in actionIds) RecastTimes.Advance(actionId, seconds);
     }
 }
 

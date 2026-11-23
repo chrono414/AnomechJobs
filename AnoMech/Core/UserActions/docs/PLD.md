@@ -30,7 +30,7 @@ _✅ works · ⚠️ partial · ❌ not simulated · ➖ nothing to simulate (pu
 | Holy Spirit | 7384 | ⚠️ | Consumes Divine Might and a Requiescat stack in one cast; should consume Divine Might alone. |
 | Intervene | 16461 | ➖ | Gap closer, native charges. |
 | Requiescat | 7383 | ✅ | Requiescat (1368, 4 stk) + Confiteor Ready (3019). |
-| Passage of Arms | 7385 | ➖ | Mitigation cone. |
+| Passage of Arms | 7385 | ✅ | Native wing animation and channel status. Arms Up lingers on party members after the channel ends. |
 | Holy Circle | 16458 | ⚠️ | Same double-consume as Holy Spirit. |
 | Atonement | 16460 | ✅ | Consumes Atonement Ready (1902) + grants Supplication Ready (3827). |
 | Supplication | 36918 | ✅ | Consumes Supplication Ready (3827) + grants Sepulchre Ready (3828). |
@@ -50,6 +50,10 @@ Oath Mastery: +5 Oath per landed auto-attack (`JobActions.AutoAttacks`); Oath is
 
 ## Role actions
 Rampart, Low Blow, Provoke, Interject, Reprisal, Arm's Length, Shirk — all ➖.
+
+## Combo interaction
+
+Confiteor and its blades preserve the weaponskill combo and its remaining time. Using a basic single-target or AoE combo action closes the blade route while leaving unspent Requiescat stacks available. Goring Blade and the Atonement chain preserve the blade route.
 
 ## Not simulated
 - **Holy Spirit / Holy Circle double-consume.** Each removes Divine Might (2673) and decrements a Requiescat (1368) stack in the same cast; in-game Divine Might is prioritized and spent alone, so a stack can be burned one cast early.

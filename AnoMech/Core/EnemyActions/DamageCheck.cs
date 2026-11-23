@@ -41,13 +41,8 @@ internal static class DamageCheck
     private static bool Survives(SimCharacter target, SimParty party, float requiredMitigation, DamageKind kind, SimCharacter caster)
     {
         if (requiredMitigation <= 0f || !ChecksMitigation(target, party)) return true;
-        var addle = caster.HasStatus(Mitigation.AddleStatusId) ? kind switch
-        {
-            DamageKind.Physical => 0.05f,
-            DamageKind.Magic => 0.10f,
-            _ => 0f,
-        } : 0f;
-        var effective = Mitigation.Effective(target.ActiveStatusSnapshot.Select(s => s.StatusId), kind, addle);
+        var effective = Mitigation.EffectiveFor(target.ActiveStatuses, kind,
+            Mitigation.OutgoingReduction(caster, kind));
         Mitigation.SpendShields(target);
         var survives = effective >= requiredMitigation - 0.0005f;
         DiagnosticLog.Info($"[EnemyAction] Mitigation check: {(target as ISimPartyMember)?.Role} has {effective:P1} {kind}, needs {requiredMitigation:P1} -- {(survives ? "survives" : "dies")}.");

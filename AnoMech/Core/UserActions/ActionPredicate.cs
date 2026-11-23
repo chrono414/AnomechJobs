@@ -1,4 +1,5 @@
 using AnoMech.Core.Native.Interfaces;
+using AnoMech.Core.UserActions.Jobs;
 
 namespace AnoMech.Core.UserActions;
 
@@ -14,9 +15,15 @@ internal sealed class ActionIdPredicate(uint id) : IActionPredicate
     public bool Matches(uint actionId) => actionId == id;
 }
 
-internal sealed class AnyWeaponskillPredicate : IActionPredicate
+internal sealed class ViperBasicFinisherPredicate : IActionPredicate
 {
-    public bool Matches(uint actionId) => Natives.Data.Action(actionId)?.ActionCategory == 3;
+    public bool Matches(uint actionId)
+        => ViperBasicCombo.IsFinisher(actionId) && PlayerCombo.IsActiveContinuation(actionId);
+}
+
+internal sealed class AnyWeaponskillPredicate(uint except = 0) : IActionPredicate
+{
+    public bool Matches(uint actionId) => actionId != except && Natives.Data.Action(actionId)?.ActionCategory == 3;
 }
 
 // Any GCD — Weaponskill (3) or Spell (2). For procs consumed by the "next spell/GCD".

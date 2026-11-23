@@ -82,14 +82,17 @@ public class SimNpc : SimCharacter
     public void SetModeAttributeFlags(byte value) => ActorControl.SetModeAttributeFlags(value);
 
     // Plays an action's own animation and VFX on this character through the same synthetic
-    // ActionEffect a boss cast fires, with itself as the target -- a bot tank's LB3 in Umad P3
-    // Limit Cut. Effects (statuses, damage) stay the caller's job, exactly as for an enemy Cast.
+    // ActionEffect a boss cast fires. Effects (statuses, damage) stay the caller's job.
     // Not for the local player: an effect the client sees itself cast ends its cast bar mid-cast
     // and leaves the Casting condition set.
-    public void PlayAction(uint actionId, float animationLock = 0.6f)
+    public void PlayAction(uint actionId, float animationLock = 0.6f, SimCharacter? target = null)
     {
+        var targetId = target?.GameObjectId ?? GameObjectId;
+        var hit = target == null ? new ActionEffectTarget(targetId)
+            : new ActionEffectTarget(targetId, [ActionEffectEntry.ActionMarker(actionId)]);
         Casting.NativeActionEffect(actionId, animationLock, (ushort)actionId, 0, ActionType.Action, 0,
-            animationTargetId: GameObjectId, targets: [new ActionEffectTarget(GameObjectId)]);
+            rotation: target == null ? null : new Placement(Position, Rotation).Face(target.Position).Rotation,
+            position: target?.Position, animationTargetId: targetId, targets: [hit]);
     }
 
     public override void Tick(float deltaSeconds)

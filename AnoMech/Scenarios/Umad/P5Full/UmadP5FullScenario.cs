@@ -64,6 +64,7 @@ internal sealed partial class UmadP5FullRun(SimWorld world, Func<SimEnemy?> boss
     private readonly UmadP5FloodState flood = new(world.Rng.Fork("full-p5-flood"), overrides.Flood);
     private readonly UmadP5CelestriadState celestriad = new(world.Rng.Fork("full-p5-celestriad"), world.Party, overrides.Celestriad);
     private readonly UmadP5ExaflaresState exaflares = new(world.Rng.Fork("full-p5-exaflares"), overrides.Exaflares);
+    private Action? checkForsakenBlackHoleContact;
 
     private const float BeforeFlood = 19.726f;
     private const float BeforeExaflares = 98.513f;
@@ -98,8 +99,7 @@ internal sealed partial class UmadP5FullRun(SimWorld world, Func<SimEnemy?> boss
         UmadP5MaddeningScenario.Schedule(world, boss, second, start + 124.778f, UmadP5MaddeningScenario.Second);
         ScheduleFellForces(start, 140f, second.HolyTank, fellRolls,
             [new(141.149f, 141.952f, 142.442f), new(144.267f, 145.073f, 145.564f), new(147.394f, 148.196f, BeforeForsaken)], soloOpening: true);
-        world.Events.Add(start + BeforeForsaken + 0.10f, () => UmadP5FullAi.MoveToCenter(party));
-        ScheduleForsaken(start + 146.321f);
+        checkForsakenBlackHoleContact = UmadP5ForsakenNull.Schedule(world, boss, start + 146.321f);
     }
 
     private void ScheduleUltima(float start, float cast, float[] hits)
@@ -109,5 +109,9 @@ internal sealed partial class UmadP5FullRun(SimWorld world, Func<SimEnemy?> boss
             world.Events.Add(start + hit, () => kefka?.CastFromHelper(UmadActions.UltimaRepeaterHit));
     }
 
-    public void Tick(float delta) => exaflares.SpreadTick?.Invoke(delta);
+    public void Tick(float delta)
+    {
+        exaflares.SpreadTick?.Invoke(delta);
+        checkForsakenBlackHoleContact?.Invoke();
+    }
 }

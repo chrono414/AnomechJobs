@@ -64,4 +64,3 @@ internal static class UmadP5FullCelestriadAi
         }
     }
 }
-

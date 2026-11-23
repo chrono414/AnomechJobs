@@ -85,5 +85,6 @@ public sealed class SimStatus : ISimObject
             target.ActorControl.LoseEffect(StatusId, Stacks, SourceObject);
         }
         if (reason is { } why) target.SimEvents?.Raise(new StatusLost(target, StatusId, Stacks, why));
+        if (reason == StatusLossReason.Expired) target.QueueStatusExpiry(StatusId);
     }
 }

@@ -9,8 +9,8 @@ _✅ works · ⚠️ partial · ❌ not simulated · ➖ nothing to simulate (pu
 | Waxing Slice | 24374 | ✅ | combo, Soul +10 |
 | Shadow of Death | 24378 | ⚠️ | Soul +10 unconditional; sheet grants it only on target KO → should be 0 on a normal cast |
 | Harpe | 24386 | ✅ | Soul +10; consumes Enhanced Harpe |
-| Hell's Ingress | 24401 | ✅ | Enhanced Harpe + Threshold |
-| Hell's Egress | 24402 | ✅ | Enhanced Harpe + Threshold |
+| Hell's Ingress | 24401 | ✅ | Enhanced Harpe. At Lv. 74+, leaves a Hellsgate at the dash origin and grants Threshold for 10s. |
+| Hell's Egress | 24402 | ✅ | Enhanced Harpe. At Lv. 74+, leaves a Hellsgate at the dash origin and grants Threshold for 10s. |
 | Spinning Scythe | 24376 | ✅ | Soul +10 |
 | Infernal Slice | 24375 | ✅ | combo, Soul +10 |
 | Whorl of Death | 24379 | ⚠️ | same KO-gated Soul as Shadow of Death |
@@ -26,7 +26,7 @@ _✅ works · ⚠️ partial · ❌ not simulated · ➖ nothing to simulate (pu
 | Unveiled Gibbet | 24390 | ✅ | Soul Reaver; −50 Soul (Blood Stalk swap) |
 | Unveiled Gallows | 24391 | ✅ | Soul Reaver; −50 Soul |
 | Arcane Circle | 24405 | ⚠️ | missing Circle of Sacrifice self-grant + Immortal Sacrifice generation |
-| Regress | 24403 | ✅ | consumes Threshold |
+| Regress | 24403 | ✅ | Consumes Threshold and clears the Hellsgate. |
 | Gluttony | 24393 | ✅ | Executioner (2 stk); −50 Soul |
 | Enshroud | 24394 | ✅ | Enshrouded + Oblatio; +5 Lemure Shroud; −50 Shroud |
 | Void Reaping | 24395 | ✅ | Enhanced Cross Reaping; Void Shroud +1; −1 Lemure |

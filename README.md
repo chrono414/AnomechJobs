@@ -1,18 +1,9 @@
 
 # ![AnomechJobs](images/icon.png) AnomechJobs
 
-Repo link: https://raw.githubusercontent.com/chrono414/AnomechJobs/main/repo.json
-
-This is an alt version of anomech with improvements to the job simulation, as well as a full P5 phase for DMU.
-
-SO far the only additional implementations are:
-- BLM lvl 100 complete rotation and starting states
-- P5 maddening orchestra and a Full P5
-
-
----------------------------------------
-
 *Another FFXIV mechanics simulator*
+
+AnomechJobs extends AnoMech with job rotation simulation, configurable starting presets, and additional Dancing Mad (Ultimate) practice.
 
 ---
  
@@ -77,7 +68,9 @@ All using default NA pf strats unless noted otherwise:
     - P5 Flood _by [Evernow](https://github.com/Evernow)_
     - P5 Exaflares _by [Wydox](https://github.com/Wydox)_
     - P5 Celestriad _by [RoarkGit](https://github.com/RoarkGit)_
-    - P5 Forsaken Null _no ai or damage_
+    - P5 Maddening Orchestra
+    - P5 Forsaken Null
+    - Full P5
 - Futures Rewritten (Ultimate) _by [grayparser](https://github.com/grayparser)_
     - P2 Diamond Dust 
     - P2 Light Rampant

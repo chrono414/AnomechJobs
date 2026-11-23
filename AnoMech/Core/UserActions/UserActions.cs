@@ -4,6 +4,7 @@ using System.Linq;
 using AnoMech.Core.Native.Implementations;
 using AnoMech.Core.Native.Implementations.Pointers;
 using AnoMech.Core.Native.Interfaces;
+using AnoMech.Core.SimObjects;
 using AnoMech.Core.UserActions.Jobs;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
@@ -17,6 +18,10 @@ public sealed unsafe class UserActions : IUserActions
 {
     private readonly ILocalPlayerInput hooks;
     private readonly BlackMageStateHandler blackMage = new();
+    private readonly WhiteMageStateHandler whiteMage = new();
+    private readonly ReaperStateHandler reaper = new();
+    private readonly MachinistStateHandler machinist = new();
+    private readonly PaladinStateHandler paladin = new();
     private readonly HasteHandler haste = new();
     private readonly TimedGaugeHandler timedGauges = new();
 
@@ -34,6 +39,10 @@ public sealed unsafe class UserActions : IUserActions
         new SprintHandler(),
         new CastTimeHandler(),
         blackMage,
+        new ManaHandler(),
+        reaper,
+        machinist,
+        paladin,
         new JobActionHandler(),
         new LimitBreakHandler(),
         new SamuraiStateHandler(),
@@ -43,6 +52,8 @@ public sealed unsafe class UserActions : IUserActions
         new PictomancerStateHandler(),
         new DancerStateHandler(),
         new ViperStateHandler(),
+        new SageStateHandler(),
+        whiteMage,
         new NinjaStateHandler(),
         new ActionEffectHandler(),
         timedGauges,
@@ -93,6 +104,10 @@ public sealed unsafe class UserActions : IUserActions
         Enabled = false;
         haste.OnSessionEnd();
         blackMage.OnSessionEnd();
+        whiteMage.OnSessionEnd();
+        machinist.OnSessionEnd();
+        paladin.OnSessionEnd();
+        reaper.OnSessionEnd();
     }
 
     // Called by Game at scenario start.
@@ -101,8 +116,8 @@ public sealed unsafe class UserActions : IUserActions
         pendingCast = null;
         if (!SimActive) return;
         foreach (var handler in handlers) if (Runs(handler)) handler.OnScenarioStart();
-        if (Enabled && Plugin.Game is { } game)
-            JobStartingState.Apply(game.World.Map.TerritoryId, blackMage, timedGauges);
+        if (Enabled && Plugin.Game?.Zone is { } zone)
+            JobStartingState.Apply(zone, blackMage, timedGauges);
     }
 
     // Called by Game when the sim zone first loads (a true session start, not a restart within
@@ -131,6 +146,28 @@ public sealed unsafe class UserActions : IUserActions
         if (!SimActive) return;
         foreach (var handler in handlers) if (Runs(handler)) handler.OnTick(deltaSeconds);
         ResolvePendingCast();
+    }
+
+    public void OnEnemyDefeated(SimEnemy enemy)
+    {
+        if (Enabled && SimActive) ReaperStateHandler.OnEnemyDefeated(enemy);
+    }
+
+    public void OnDamageTaken(SimCharacter target)
+    {
+        if (Enabled && SimActive) whiteMage.OnDamageTaken(target);
+    }
+
+    public void OnStatusExpired(SimCharacter target, ushort statusId)
+    {
+        if (!Enabled || !SimActive) return;
+        if (statusId == 3903) WhiteMageStateHandler.ApplyDivineAura(target);
+        whiteMage.OnStatusExpired(target, statusId);
+    }
+
+    public void OnPartyAction(SimCharacter member, uint actionId)
+    {
+        if (Enabled && SimActive) reaper.OnPartyAction(member, actionId);
     }
 
     private void OnActionExecuted(LocalActionExecution action)
@@ -206,6 +243,9 @@ public sealed unsafe class UserActions : IUserActions
     {
         haste.OnSessionEnd();
         blackMage.OnSessionEnd();
+        whiteMage.OnSessionEnd();
+        paladin.OnSessionEnd();
+        reaper.OnSessionEnd();
         hooks.ActionExecuted -= OnActionExecuted;
         hooks.AdjustActionId = null;
         hooks.AdjustCastTime = null;

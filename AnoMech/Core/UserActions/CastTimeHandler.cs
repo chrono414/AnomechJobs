@@ -42,8 +42,8 @@ internal sealed class CastTimeHandler : IUserActionHandler
     public void OnCastInterrupted(ActionType actionType, uint actionId) => castAction = 0;
 
     public int? AdjustCastTime(ActionType actionType, uint actionId)
-        => actionType == ActionType.Action && Plugin.Game?.Player is { } player && player.HasStatus(DualcastStatus)
-           && IsCastTimeSpell(actionId) ? 0 : null;
+        => actionType == ActionType.Action && IsCastTimeSpell(actionId) && Plugin.Game?.Player is { } player &&
+           (player.HasStatus(DualcastStatus) || IsJobInstant(player, actionId)) ? 0 : null;
 
     private static bool IsInstantByTrait(uint actionId)
         => actionId is Foul or 16505 && (Plugin.ObjectTable.LocalPlayer?.Level ?? 0) >= (actionId == Foul ? 80 : 100);
@@ -116,9 +116,19 @@ internal sealed class CastTimeHandler : IUserActionHandler
     // Verthunder III/Veraero III/Impact; Firestarter → Fire III; Thunderhead → the Thunder line).
     private static bool SpellSpecific(SimPlayer p, uint actionId)
     {
+        if (IsJobInstant(p, actionId)) return true;
         if (p.HasStatus(Acceleration) && actionId is 25855 or 25856 or 16526) return true;
         if (p.HasStatus(Firestarter) && actionId == 152) return true;
         if (p.HasStatus(Thunderhead) && actionId is 144 or 7447 or 153 or 7420 or 36986 or 36987) return true;
         return false;
     }
+
+    private static bool IsJobInstant(SimPlayer player, uint actionId) => PlayerJob.Current switch
+    {
+        JobId.Paladin => JobActionHandler.UsesDivineMight(actionId, player) || player.HasStatus(1368),
+        JobId.Reaper => actionId == 24386 && player.HasStatus(2845) || actionId == 24387 &&
+            !Plugin.Condition[Dalamud.Game.ClientState.Conditions.ConditionFlag.InCombat],
+        JobId.Sage => Jobs.SageStateHandler.IsAugmentedSpell(actionId),
+        _ => false,
+    };
 }

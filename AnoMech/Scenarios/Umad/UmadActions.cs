@@ -13,6 +13,26 @@ namespace AnoMech.Scenarios.Umad;
 
 public static class UmadActions
 {
+    // The practice bots park on the first black hole.
+    private static readonly AreaSpec ForsakenGroundArea = new()
+    {
+        CastTypeOverride = Core.Native.Interfaces.CastType.Circle,
+        AdjustTargets = (ctx, hits) => hits.Where(member => member == ctx.Party.Player || !ctx.Party.IsBotDriven(member)).ToArray(),
+    };
+
+    internal static readonly EnemyAction ForsakenBlackHole = new(UmadP5ForsakenNull.Constants.ActionId.ForsakenGround)
+    {
+        Cast = new() { AnimationLock = 0f },
+        Area = ForsakenGroundArea,
+        Effects = [Damage(Lethal)],
+    };
+
+    internal static readonly EnemyAction ForsakenBait = new(UmadP5ForsakenNull.Constants.ActionId.Forsaken_BB38)
+    {
+        Area = ForsakenGroundArea,
+        Effects = [Damage(Lethal)],
+    };
+
     internal static readonly VulnSpec MagicVulns = VulnerableTo(UmadConstants.StatusId.MagicVulnerabilityUp);
 
     private static readonly IEnemyActionEffect MagicVulnerabilityUp =

@@ -10,6 +10,7 @@ internal sealed class FakeZoneControl(FakeCharacter player, SimTimeline timeline
     private float innRotation;
 
     public bool IsActive { get; private set; }
+    public byte? PracticeLevel { get; private set; }
 
     public bool IsInInn() => !IsActive;
 
@@ -21,11 +22,12 @@ internal sealed class FakeZoneControl(FakeCharacter player, SimTimeline timeline
 
     public void EndSpeedBuffs() { }
 
-    public bool Enter(uint territoryId, Vector3 playerSpawn)
+    public bool Enter(uint territoryId, Vector3 playerSpawn, byte? practiceLevel = null)
     {
         innPosition = player.Position;
         innRotation = player.Rotation;
         player.Position = playerSpawn;
+        PracticeLevel = practiceLevel;
         IsActive = true;
         return true;
     }
@@ -35,6 +37,7 @@ internal sealed class FakeZoneControl(FakeCharacter player, SimTimeline timeline
         if (!IsActive) return;
         player.Position = innPosition;
         player.Rotation = innRotation;
+        PracticeLevel = null;
         IsActive = false;
     }
 

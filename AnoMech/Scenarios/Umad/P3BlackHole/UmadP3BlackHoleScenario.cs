@@ -69,8 +69,11 @@ public sealed class UmadP3BlackHoleScenario : IMultiplayerReplayable
         party = worldParam.Party;
         state = new UmadP3BlackHoleState(world, settingsWindow.Overrides);
         LastState = state;
-        if (selectedAi is { } idx && idx < AiStrats.Count)
-            ((IScenarioAi<UmadP3BlackHoleState>)AiStrats[idx]).Run(state, world);
+        var strats = AiStrats;
+        var ai = selectedAi is { } idx && idx >= 0 && idx < strats.Count ? (UmadP3BlackHoleAi)strats[idx] : null;
+        ai?.Run(state, world);
+        if (settingsWindow.Overrides.Automarkers)
+            (ai ?? (UmadP3BlackHoleAi)strats[0]).ScheduleAutomarkers(world, state.Roles);
 
         PrimodialCrustsToResolve = 0;
 

@@ -179,6 +179,12 @@ internal sealed unsafe class BattleCharaProxy : IBattleCharaProxy
         }
     }
 
+    public void SetHitboxRadius(float radius)
+    {
+        var obj = Ptr;
+        if (obj != null && Slot >= 0) obj->HitboxRadius = radius;
+    }
+
     // ── Model ────────────────────────────────────────────────────────────────
 
     public bool HasDrawObject

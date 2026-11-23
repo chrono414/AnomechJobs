@@ -12,6 +12,8 @@ internal sealed class HasteHandler : IUserActionHandler
     private static readonly (JobId Job, ushort Status, AttackTiming Percent)[] StatusHaste =
     [
         (JobId.BlackMage, BlackMageStateHandler.CircleOfPower, new(85, 85)),
+        (JobId.WhiteMage, 157, new(80, 80)),      // Presence of Mind
+        (JobId.Viper, 3669, new(85, 85)),        // Swiftscaled
     ];
 
     private (uint PlayerId, AttackTiming Baseline, AttackTiming Applied)? adjustment;

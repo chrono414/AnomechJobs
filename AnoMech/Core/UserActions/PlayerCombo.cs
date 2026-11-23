@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AnoMech.Core.UserActions.Jobs;
 using FFXIVClientStructs.FFXIV.Client.Game;
 
 namespace AnoMech.Core.UserActions;
@@ -43,9 +44,28 @@ internal static unsafe class PlayerCombo
         [7528] = 7512, [45961] = 7512, // Enchanted Zwerchhau
         [7529] = 7516, [45962] = 7516, // Enchanted Redoublement
         [7526] = 7525,                 // Verholy
+        [7411] = 2866, [7412] = 2868, [7413] = 2873, // Heated Machinist combo
     };
 
+    internal static void Seed(uint actionId, float time)
+    {
+        var manager = ActionManager.Instance();
+        if (manager == null) return;
+        manager->Combo.Action = actionId;
+        manager->Combo.Timer = time;
+    }
+
     private static uint ComboId(uint actionId) => ComboForms.GetValueOrDefault(actionId, actionId);
+
+    // The hotbar's ActionCombo rows point to the base shot IDs at every sync level.
+    internal static (uint Action, float Remaining)? MachinistNextState(uint actionId, ComboRole role)
+        => (ComboId(actionId), role) switch
+        {
+            (2866, ComboRole.Starter) => (2866u, 30f),
+            (2868, ComboRole.Continuation) => (2868u, 30f),
+            (2873, _) or (2868, ComboRole.None) => (0u, 0f),
+            _ => null,
+        };
 
     // The action `actionId` combos from (0 = it isn't a continuation).
     private static uint PrerequisiteOf(uint actionId)
@@ -59,8 +79,13 @@ internal static unsafe class PlayerCombo
     // or None (not a combo action, or a continuation used out of order → doesn't advance).
     public static ComboRole RoleOf(uint actionId)
     {
+        if (PaladinStateHandler.IsConfiteorCombo(actionId)) return ComboRole.None;
+
         var am = ActionManager.Instance();
         if (am == null) return ComboRole.None;
+
+        if (ViperBasicCombo.RoleOf(actionId, am->Combo.Action, am->Combo.Timer) is { } viperRole)
+            return viperRole;
 
         actionId = ComboId(actionId);
         var prereq = PrerequisiteOf(actionId);

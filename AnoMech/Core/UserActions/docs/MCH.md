@@ -14,7 +14,7 @@ _✅ works · ⚠️ partial · ❌ not simulated · ➖ nothing to simulate (pu
 | Clean Shot → Heated Clean Shot | 7413 | ✅ | Heat +5, Battery +10 (combo). |
 | Hypercharge | 17209 | ⚠️ | Overheated (2688) ×5 correct, but always drains 50 Heat even when Hypercharged makes it free. |
 | Heat Blast → Blazing Shot | 36978 | ✅ | Consumes Overheated. |
-| Rook Autoturret → Automaton Queen | 16501 | ➖ | Battery −50 handled; pet not modelled. |
+| Rook Autoturret → Automaton Queen | 2864 / 16501 | ⚠️ | Spends stored Battery and spawns the summon with attack and finisher animations. |
 | Rook Overdrive → Queen Overdrive | 16502 | ➖ | |
 | Wildfire | 2878 | ✅ | Grants Wildfire (1946, 10s), driving the Detonator swap. |
 | Detonator | 16766 | ✅ | Consumes Wildfire (1946). |
@@ -28,7 +28,6 @@ _✅ works · ⚠️ partial · ❌ not simulated · ➖ nothing to simulate (pu
 | Flamethrower | 7418 | ❌ | Channel self-status (1205) not applied. |
 | Bioblaster | 16499 | ➖ | |
 | Air Anchor | 16500 | ✅ | Battery +20. |
-| Automaton Queen | 16501 | ➖ | Battery −50 handled; pet not modelled. |
 | Queen Overdrive | 16502 | ➖ | |
 | Pile Bunker / Crowned Collider / Arm Punch / Roller Dash | — | ➖ | Pet actions, not hotbarable. |
 | Scattergun | 25786 | ✅ | Heat +10. |
@@ -48,4 +47,4 @@ Leg Graze, Second Wind, Foot Graze, Peloton, Head Graze, Arm's Length — all �
 - **Flamethrower channel status (1205)** not applied — cosmetic channel buff icon.
 - **Hypercharge over-drains Heat.** `ApplyCost` subtracts 50 Heat every cast; when Hypercharged (3864) is active the real cost is 0.
 - **Full Metal Field clears Reassembled.** `StatusClearedOnAction[851] = AnyWeaponskill()` matches FMF (36982), but FMF is not affected by Reassemble and shouldn't consume it.
-- **Automaton Queen / Rook pet** not modelled (out of scope — damage entity). Player-side Battery spend via `CostGauges[62]` is handled; the pet, its `SummonTimeRemaining` timer, and `LastSummonBatteryPower` scaling are not.
+- **Automaton Queen / Rook damage** is not simulated. Overdrive and timer expiry play the finisher sequence before the summon despawns.

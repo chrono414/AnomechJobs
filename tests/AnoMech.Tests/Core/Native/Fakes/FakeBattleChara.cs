@@ -47,6 +47,10 @@ internal sealed class FakeBattleChara(FakeBattleCharas owner, int slot) : IBattl
     }
 
     public float HitboxRadius => Actor?.HitboxRadius ?? 0f;
+    public void SetHitboxRadius(float radius)
+    {
+        if (Actor is { } actor) actor.HitboxRadius = radius;
+    }
 
     // ── Model ────────────────────────────────────────────────────────────────
 

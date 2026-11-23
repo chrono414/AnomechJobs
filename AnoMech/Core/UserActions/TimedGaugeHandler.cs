@@ -34,8 +34,8 @@ internal sealed unsafe class TimedGaugeHandler : IUserActionHandler
     private sealed class Tracker { public float Timer; public int LastValue = -1; }
     private readonly Dictionary<TimedGauge, Tracker> trackers = new();
 
-    public void OnScenarioStart() => ResetScenarioTrackers();
-    public void OnSessionEnd() => ResetScenarioTrackers();
+    public void OnScenarioStart() => trackers.Clear();
+    public void OnSessionEnd() => trackers.Clear();
 
     internal void Seed(TimedGauge gauge, JobGaugeManager* jgm, float elapsed)
     {
@@ -44,11 +44,8 @@ internal sealed unsafe class TimedGaugeHandler : IUserActionHandler
         trackers[gauge] = tracker;
     }
 
-    private void ResetScenarioTrackers()
-    {
-        foreach (var gauge in JobActions.TimedGauges)
-            if (gauge.UseScenarioTime) trackers.Remove(gauge);
-    }
+    internal void SeedDecay(TimedGauge gauge, JobGaugeManager* jgm, float remaining)
+        => trackers[gauge] = new Tracker { LastValue = gauge.Gauge.Read(jgm), Timer = remaining };
 
     public void OnTick(float deltaSeconds)
     {
@@ -61,14 +58,9 @@ internal sealed unsafe class TimedGaugeHandler : IUserActionHandler
         {
             if (tg.Job != job) continue;
             if (!trackers.TryGetValue(tg, out var tr)) trackers[tg] = tr = new Tracker();
-            if (tg.Decay) TickDecay(tg, tr, jgm, deltaSeconds);
-            else
-            {
-                var dt = deltaSeconds;
-                if (tg.UseScenarioTime && Plugin.Game is { } game)
-                    dt = game.SimulationDelta(deltaSeconds);
-                TickRegen(tg, ref tr.Timer, jgm, dt);
-            }
+            var dt = tg.UseScenarioTime && Plugin.Game is { } game ? game.SimulationDelta(deltaSeconds) : deltaSeconds;
+            if (tg.Decay) TickDecay(tg, tr, jgm, dt);
+            else TickRegen(tg, ref tr.Timer, jgm, dt);
         }
     }
 
@@ -85,7 +77,10 @@ internal sealed unsafe class TimedGaugeHandler : IUserActionHandler
         {
             timer -= tg.Seconds;
             tg.Gauge.Add(jgm, tg.Amount);
-            if (!tg.ContinueAtCap) break;
+            if (tg.ContinueAtCap || tg.Gauge.Read(jgm) < tg.Gauge.Max) continue;
+            timer = 0f;
+            tg.WriteTimer?.Invoke(jgm, 0);
+            return;
         }
         var displayed = tg.Countdown ? tg.Seconds - timer : timer;
         tg.WriteTimer?.Invoke(jgm, (int)(displayed * 1000f));

@@ -27,6 +27,7 @@ public enum StatusLossReason
     Expired,
     Removed,
     Died,
+    Absorbed,
 }
 
 public sealed record StatusLost(SimCharacter Holder, ushort StatusId, ushort Stacks, StatusLossReason Reason);

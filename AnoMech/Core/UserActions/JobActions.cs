@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using AnoMech.Core.Native.Implementations;
+using Dalamud.Game.ClientState.Conditions;
 using AnoMech.Core.SimObjects;
+using AnoMech.Core.UserActions.Jobs;
 using FFXIVClientStructs.FFXIV.Client.Game;
 
 namespace AnoMech.Core.UserActions;
@@ -174,7 +176,7 @@ internal static unsafe class JobActions
     private static readonly ResourceGauge VprRattlingCoil = new()
     {
         Read = jgm => jgm->Viper.RattlingCoilStacks,
-        Write = (jgm, v) => jgm->Viper.RattlingCoilStacks = (byte)v,
+        Write = (jgm, v) => jgm->Viper.RattlingCoilStacks = (byte)Math.Min(v, PlayerJob.Level >= 88 ? 3 : 2),
         Max = 3,
     };
 
@@ -229,7 +231,7 @@ internal static unsafe class JobActions
     private static readonly ResourceGauge SamMeditation = new() { Read = jgm => jgm->Samurai.MeditationStacks, Write = (jgm, v) => jgm->Samurai.MeditationStacks = (byte)v, Max = 3 };
     private static readonly ResourceGauge RprLemureShroud = new() { Read = jgm => jgm->Reaper.LemureShroud, Write = (jgm, v) => jgm->Reaper.LemureShroud = (byte)v, Max = 5 };
     private static readonly ResourceGauge RprVoidShroud = new() { Read = jgm => jgm->Reaper.VoidShroud, Write = (jgm, v) => jgm->Reaper.VoidShroud = (byte)v, Max = 8 };
-    private static readonly ResourceGauge SgeAddersting = new() { Read = jgm => jgm->Sage.Addersting, Write = (jgm, v) => jgm->Sage.Addersting = (byte)v, Max = 3 };
+    private static readonly ResourceGauge SgeAddersting = new() { Read = jgm => jgm->Sage.Addersting, Write = (jgm, v) => jgm->Sage.Addersting = (byte)v, Max = SageStateHandler.MaxAddersting };
     private static readonly ResourceGauge PctPalette = new() { Read = jgm => jgm->Pictomancer.PalleteGauge, Write = (jgm, v) => jgm->Pictomancer.PalleteGauge = (byte)v, Max = 100 };
     private static readonly ResourceGauge PctPaint = new() { Read = jgm => jgm->Pictomancer.Paint, Write = (jgm, v) => jgm->Pictomancer.Paint = (byte)v, Max = 5 };
     private static readonly ResourceGauge BlmPolyglot = new PolyglotGauge() { Read = jgm => jgm->BlackMage.PolyglotStacks, Write = (jgm, v) => jgm->BlackMage.PolyglotStacks = (byte)v, Max = 3 };
@@ -256,11 +258,13 @@ internal static unsafe class JobActions
 
     public static readonly TimedGauge[] TimedGauges =
     [
-        new(JobId.WhiteMage, WhmLily, 20f, decay: false, writeTimer: (jgm, v) => jgm->WhiteMage.LilyTimer = (short)v),        // Healing Lily: +1 every 20s
+        new(JobId.WhiteMage, WhmLily, 20f, decay: false, writeTimer: (jgm, v) => jgm->WhiteMage.LilyTimer = (short)v,
+            isActive: _ => PlayerJob.Level >= 52 && Plugin.Condition[ConditionFlag.InCombat], useScenarioTime: true),        // Healing Lily: +1 every 20s
         BlackMagePolyglotTimer,
-        new(JobId.Sage, SgeAddersgall, 20f, decay: false, writeTimer: (jgm, v) => jgm->Sage.AddersgallTimer = (short)v), // Addersgall: +1 every 20s
+        new(JobId.Sage, SgeAddersgall, 20f, decay: false, writeTimer: (jgm, v) => jgm->Sage.AddersgallTimer = (short)v,
+            isActive: _ => PlayerJob.Level >= 45, useScenarioTime: true), // Addersgall: +1 every 20s
         new(JobId.Gunbreaker, GnbComboStep, 30f, decay: true),    // Gnashing Fang combo: resets to 0 after 30s (no visual timer field)
-        new(JobId.Paladin, PldConfiteorStep, 30f, decay: true), // Confiteor route: safety reset if abandoned mid-combo
+        new(JobId.Paladin, PldConfiteorStep, 30f, decay: true, useScenarioTime: true), // Confiteor route: safety reset if abandoned mid-combo
         new(JobId.DarkKnight, DrkDeliriumStep, 30f, decay: true),  // Scarlet Delirium route: safety reset if abandoned mid-combo
     ];
 
@@ -295,7 +299,10 @@ internal static unsafe class JobActions
 
         // Tank role
         [7531] = [Status(1191, 20f)],   // Rampart
-        [7535] = [EnemyStatus(1193, 15f)],   // Reprisal
+        [7535] = [new BelowLevelEffect(98, EnemyStatus(1193, 10f)), AtLevel(98, EnemyStatus(1193, 15f))],
+        [7548] = [Status(Mitigation.ArmsLengthStatusId, 6f)],
+        [7549] = [new BelowLevelEffect(98, EnemyStatus(Mitigation.FeintStatusId, 10f)),
+            AtLevel(98, EnemyStatus(Mitigation.FeintStatusId, 15f))],   // Reprisal
 
         // Caster and healer role
         [7559] = [Status(Mitigation.SurecastStatusId, 6f)], // Surecast
@@ -311,19 +318,26 @@ internal static unsafe class JobActions
         // WAR
         [37] = [Combo(Gauge(WarBeast, 10))],   // Maim
         [42] = [Combo(Gauge(WarBeast, 20))],   // Storm's Path
-        [45] = [Combo(Gauge(WarBeast, 10), Status(2677, 30f))],   // Storm's Eye (+ Surging Tempest)
-        [52] = [Gauge(WarBeast, 50), Status(1897, 30f)],          // Infuriate (+ Nascent Chaos)
-        [16462] = [Combo(Status(2677, 30f), Gauge(WarBeast, 20))],  // Mythril Tempest → Surging Tempest + 20 Beast
-        [7389]  = [Status(1177, 15f, 3), Status(2624, 30f)],  // Inner Release (3 stk) + Primal Rend Ready
-        [25753] = [Status(3834, 20f)],         // Primal Rend → Primal Ruination Ready
+        [45] = [Combo(Gauge(WarBeast, 10), Extend(2677, 30f, 60f))],   // Storm's Eye (+ Surging Tempest)
+        [52] = [Gauge(WarBeast, 50), AtLevel(72, Status(1897, 30f))],          // Infuriate (+ Nascent Chaos)
+        [16462] = [Combo(Extend(2677, 30f, 60f), AtLevel(74, Gauge(WarBeast, 20)))],  // Mythril Tempest → Surging Tempest + 20 Beast
+        [38]   = [Status(86, 15f, 3), Extend(2677, 10f, 60f, existingOnly: true)], // Berserk
+        [48]   = [Status(91, 0f)],                             // Defiance
+        [7389] = [Status(1177, 15f, 3), Status(2663, 15f), AtLevel(90, Status(2624, 30f)), Extend(2677, 10f, 60f, existingOnly: true)],  // Inner Release (3 stk) + Primal Rend Ready
+        [25753] = [AtLevel(100, Status(3834, 20f))],         // Primal Rend → Primal Ruination Ready
+        [3549] = [AtLevel(66, Refund(5f, 52))],
+        [3550] = [AtLevel(66, Refund(5f, 52))],
+        [16463] = [Refund(5f, 52)],
+        [16465] = [Refund(5f, 52)],
         // mitigation:
         [43]    = [Status(409, 10f)],          // Holmgang
-        [44]    = [Status(3832, 15f)], [36923] = [Status(3832, 15f)],   // Vengeance / Damnation → Damnation
+        [44]    = [Status(89, 15f)], [36923] = [Status(3832, 15f)],   // Vengeance / Damnation → Damnation
         [40]    = [Status(87, 10f)],           // Thrill of Battle
-        [7388]  = [TargetStatus(1457, 30f), TargetStatus(2108, 15f)],   // Shake It Off (+ Over Time)
-        [3551]  = [Status(2678, 8f), Status(2679, 4f), Status(2680, 20f)],   // Raw Intuition → Bloodwhetting + Stem the Flow + Stem the Tide
+        [7388]  = [new Jobs.ShakeItOffEffect(), TargetStatus(2108, 15f)],   // Shake It Off (+ Over Time)
+        [3551]  = [Status(735, 6f)],   // Raw Intuition → Bloodwhetting + Stem the Flow + Stem the Tide
         [25751] = [Status(2678, 8f), Status(2679, 4f), Status(2680, 20f)],   // Bloodwhetting
-        [16464] = [TargetStatus(1858, 8f), Status(2679, 4f), Status(2680, 20f)],   // Nascent Flash → Nascent Glint on the target
+        [16464] = [new BelowLevelEffect(82, Status(1857, 6f)), new BelowLevelEffect(82, TargetStatus(1858, 6f)),
+            AtLevel(82, Status(1857, 8f), TargetStatus(1858, 8f), TargetStatus(2679, 4f), TargetStatus(2680, 20f))],   // Nascent Flash → Nascent Glint on the target
 
         // DRK
         [3632]  = [Combo(Gauge(DrkBlood, 20))],   // Souleater
@@ -369,10 +383,10 @@ internal static unsafe class JobActions
         [25774] = [Gauge(NinNinki, 10)],         // Phantom Kamaitachi
         [25777] = [Gauge(NinNinki, 5)],          // Forked Raiju
         [25778] = [Gauge(NinNinki, 5)],          // Fleeting Raiju
-        [36957] = [Gauge(NinNinki, 40), Status(3850, 30f)], // Dokumori (+ Higi)
+        [36957] = [Gauge(NinNinki, 40), Unlocks(36960, Status(3850, 30f))], // Dokumori (+ Higi)
         [2264]  = [Status(497, 15f)],                     // Kassatsu
-        [7403]  = [Status(1186, 6f), Status(3851, 30f)],  // Ten Chi Jin + Tenri Jindo Ready
-        [16493] = [Status(1954, 30f, 5), Status(2723, 45f)], // Bunshin (5 stk) + Phantom Kamaitachi Ready
+        [7403]  = [Status(1186, 6f), Unlocks(36961, Status(3851, 30f))],  // Ten Chi Jin + Tenri Jindo Ready
+        [16493] = [Status(1954, 30f, 5), Unlocks(25774, Status(2723, 45f))], // Bunshin (5 stk) + Phantom Kamaitachi Ready
         [2269]  = [Status(3848, 20f)],                    // Huton → Shadow Walker
         [2271]  = [Status(3848, 20f)],                    // Suiton → Shadow Walker
         [18879] = [Status(3848, 20f)],                    // Huton (Ten Chi Jin) → Shadow Walker
@@ -384,8 +398,6 @@ internal static unsafe class JobActions
         [24375] = [Combo(Gauge(RprSoul, 10))],   // Infernal Slice
         [24376] = [Gauge(RprSoul, 10)],          // Spinning Scythe
         [24377] = [Combo(Gauge(RprSoul, 10))],   // Nightmare Scythe
-        [24378] = [Gauge(RprSoul, 10)],          // Shadow of Death
-        [24379] = [Gauge(RprSoul, 10)],          // Whorl of Death
         [24380] = [Gauge(RprSoul, 50)],          // Soul Slice
         [24381] = [Gauge(RprSoul, 50)],          // Soul Scythe
         [24386] = [Gauge(RprSoul, 10)],          // Harpe
@@ -398,15 +410,16 @@ internal static unsafe class JobActions
         [36972] = [Gauge(RprShroud, 10)],        // Executioner's Guillotine
         // status grants:
         [24389] = [Status(2587, 30f)], [24392] = [Status(2587, 30f)], [24390] = [Status(2587, 30f)], [24391] = [Status(2587, 30f)], // → Soul Reaver
-        [24395] = [Gauge(RprVoidShroud, 1), Status(2591, 30f)], [24396] = [Gauge(RprVoidShroud, 1), Status(2590, 30f)], // Void/Cross Reaping → +1 Void Shroud + Enhanced Cross/Void
-        [24397] = [Gauge(RprVoidShroud, 1)],   // Grim Reaping → +1 Void Shroud
-        [24394] = [Gauge(RprLemureShroud, 5), Status(2593, 30f), Status(3857, 30f)],  // Enshroud → 5 Lemure Shroud + Enshrouded + Oblatio
-        [24393] = [Status(3858, 30f, 2)],                  // Gluttony → Executioner (2 stk)
+        [24395] = [AtLevel(86, Gauge(RprVoidShroud, 1)), Status(2591, 30f)], [24396] = [AtLevel(86, Gauge(RprVoidShroud, 1)), Status(2590, 30f)], // Void/Cross Reaping → +1 Void Shroud + Enhanced Cross/Void
+        [24397] = [AtLevel(86, Gauge(RprVoidShroud, 1))],   // Grim Reaping → +1 Void Shroud
+        [24394] = [SetGauge(RprLemureShroud, 5), SetGauge(RprVoidShroud, 0), Status(2593, 30f), AtLevel(92, Status(3857, 30f))],  // Enshroud → 5 Lemure Shroud + Enshrouded + Oblatio
+        [24393] = [AtLevel(96, Status(3858, 30f, 2))],                  // Gluttony → Executioner (2 stk)
         [24387] = [Status(2594, 0f)],                      // Soulsow (no-expiry)
-        [24401] = [Status(2845, 10f), Status(2595, 10f)], [24402] = [Status(2845, 10f), Status(2595, 10f)], // Ingress/Egress → Enhanced Harpe + Threshold
-        [24385] = [Status(3905, 30f), Status(3859, 30f)],  // Plentiful Harvest → Ideal Host + Perfectio Occulta
-        [24398] = [Status(3860, 30f)],                     // Communio → Perfectio Parata
-        [24405] = [Status(2599, 20f), Status(2601, 6f)],   // Arcane Circle + Bloodsown Circle
+        [ReaperStateHandler.HellsIngress] = [Status(2845, 10f), AtLevel(ReaperStateHandler.HellsgateLevel, Status(ReaperStateHandler.Threshold, 10f))],
+        [ReaperStateHandler.HellsEgress] = [Status(2845, 10f), AtLevel(ReaperStateHandler.HellsgateLevel, Status(ReaperStateHandler.Threshold, 10f))],
+        [24385] = [Status(3905, 30f), AtLevel(100, Status(3859, 30f))],  // Plentiful Harvest → Ideal Host + Perfectio Occulta
+        [24404] = [Status(2596, 5f)], // Arcane Crest
+        [24405] = [Status(2599, 20f), AtLevel(88, Status(2600, 5f), Status(2601, 6f))],   // Arcane Circle + Bloodsown Circle
 
         // SAM — Kenki only; Sen is a flag set, handled elsewhere if ever
         [36963] = [Gauge(SamKenki, 5)],          // Gyofu (upgrades from Hakaze)
@@ -426,17 +439,26 @@ internal static unsafe class JobActions
         [7489]  = [Gauge(SamMeditation, 1)], [25781] = [Gauge(SamMeditation, 1)], // Higanbana / Ogi Namikiri → +1 Meditation
 
         // MCH — max-level (Heated) ids; combo prereqs upgrade, resolved via PlayerCombo
+        [2866]  = [Gauge(MchHeat, 5)],                         // Split Shot
+        [2868]  = [Combo(Gauge(MchHeat, 5))],                   // Slug Shot
+        [2873]  = [Combo(Gauge(MchHeat, 5), Gauge(MchBattery, 10))], // Clean Shot
+        [2872]  = [Gauge(MchBattery, 20)],                      // Hot Shot
         [7411]  = [Gauge(MchHeat, 5)],                                 // Heated Split Shot
         [7412]  = [Combo(Gauge(MchHeat, 5))],                          // Heated Slug Shot
         [7413]  = [Combo(Gauge(MchHeat, 5), Gauge(MchBattery, 10))],   // Heated Clean Shot
         [2870]  = [Gauge(MchHeat, 5)],                                 // Spread Shot
         [25786] = [Gauge(MchHeat, 10)],                               // Scattergun
         [16500] = [Gauge(MchBattery, 20)],                            // Air Anchor
-        [25788] = [Gauge(MchBattery, 20), Status(3865, 30f)],         // Chain Saw (+ Excavator Ready)
+        [25788] = [Gauge(MchBattery, 20), AtLevel(96, Status(3865, 30f))],         // Chain Saw (+ Excavator Ready)
         [36981] = [Gauge(MchBattery, 20)],                            // Excavator
         [2876]  = [Status(851, 5f)],                                  // Reassemble → Reassembled
         [17209] = [Status(2688, 10f, 5)],                             // Hypercharge → Overheated (5 stk)
-        [7414]  = [Status(3864, 30f), Status(3866, 30f)],             // Barrel Stabilizer → Hypercharged + Full Metal Machinist
+        [7414]  = [Status(3864, 30f), AtLevel(100, Status(3866, 30f))],             // Barrel Stabilizer → Hypercharged + Full Metal Machinist
+        [7410]  = [AtLevel(15, Refund(15f, 2874)), AtLevel(50, Refund(15f, 2890))], // Heat Blast
+        [36978] = [Refund(15f, 36979, 36980)],                  // Blazing Shot
+        [16499] = [new DamageOverTimeEffect(1866, 15f)],
+        [16889] = [new TargetStatusEffect(1951, 15f, incompatible: 1934, secondIncompatible: 1826)],
+        [2887]  = [EnemyStatus(Mitigation.DismantleStatusId, 10f)],
         [2878]  = [Status(1946, 10f)],                                // Wildfire → self-status (enables Detonator)
 
         // RDM — all flat: mana is "Additional Effect", never combo-gated
@@ -455,9 +477,9 @@ internal static unsafe class JobActions
         [25858] = [Gauge(RdmWhite, 4), Gauge(RdmBlack, 4)],   // Resolution
         [7505]  = [Random(0.5f, Status(1234, 30f))],   // Verthunder → Verfire Ready (50%)
         [7507]  = [Random(0.5f, Status(1235, 30f))],   // Veraero → Verstone Ready (50%)
-        [7518]  = [Status(1238, 20f), Status(3877, 30f)],  // Acceleration + Grand Impact Ready
-        [7520]  = [Status(1239, 20f), Status(3876, 30f)],  // Embolden + Thorned Flourish
-        [7521]  = [Status(1971, 30f), Status(3875, 30f, 3), Status(3878, 30f)], // Manafication → range + Magicked Swordplay (3 stk) + Prefulgence Ready
+        [7518]  = [Status(1238, 20f), Unlocks(37006, Status(3877, 30f))],  // Acceleration + Grand Impact Ready
+        [7520]  = [Status(1239, 20f), Unlocks(37005, Status(3876, 30f))],  // Embolden + Thorned Flourish
+        [7521]  = [Status(1971, 30f), Status(3875, 30f, 3), Unlocks(37007, Status(3878, 30f))], // Manafication → range + Magicked Swordplay (3 stk) + Prefulgence Ready
         // Enchanted melee each grant 1 Mana Stack (at 3, Verthunder/Veraero → Verflare/Verholy):
         [7527] = [Gauge(RdmManaStacks, 1)], [7528] = [Gauge(RdmManaStacks, 1)], [7529] = [Gauge(RdmManaStacks, 1)], // Enchanted Riposte/Zwerchhau/Redoublement
         [45960] = [Gauge(RdmManaStacks, 1)], [45961] = [Gauge(RdmManaStacks, 1)], [45962] = [Gauge(RdmManaStacks, 1)], // the same under Manafication
@@ -474,30 +496,38 @@ internal static unsafe class JobActions
         // VPR
         [34620] = [Gauge(VprRattlingCoil, 1)],      // Vicewinder
         [34623] = [Gauge(VprRattlingCoil, 1)],      // Vicepit
-        [34647] = [Gauge(VprRattlingCoil, 1), Status(3671, 30f)],   // Serpent's Ire (+ Ready to Reawaken)
-        [34610] = [Gauge(VprSerpentOffering, 10), Status(3647, 60f)],  // Flanksting Strike (+ Hindstung Venom)
-        [34611] = [Gauge(VprSerpentOffering, 10), Status(3648, 60f)],  // Flanksbane Fang (+ Hindsbane Venom)
-        [34612] = [Gauge(VprSerpentOffering, 10), Status(3646, 60f)],  // Hindsting Strike (+ Flanksbane Venom)
-        [34613] = [Gauge(VprSerpentOffering, 10), Status(3645, 60f)],  // Hindsbane Fang (+ Flankstung Venom)
-        [34618] = [Gauge(VprSerpentOffering, 10), Status(3650, 60f)],  // Jagged Maw (+ Grimskin's Venom)
-        [34619] = [Gauge(VprSerpentOffering, 10), Status(3649, 60f)],  // Bloodied Maw (+ Grimhunter's Venom)
-        [34621] = [Gauge(VprSerpentOffering, 5), Status(3668, 40f), Status(3657, 30f)],   // Hunter's Coil (+ Hunter's Instinct + Hunter's Venom)
-        [34622] = [Gauge(VprSerpentOffering, 5), Status(3669, 40f), Status(3658, 30f)],   // Swiftskin's Coil (+ Swiftscaled + Swiftskin's Venom)
-        [34624] = [Gauge(VprSerpentOffering, 5), Status(3668, 40f), Status(3659, 30f)],   // Hunter's Den (+ Hunter's Instinct + Fellhunter's Venom)
-        [34625] = [Gauge(VprSerpentOffering, 5), Status(3669, 40f), Status(3660, 30f)],   // Swiftskin's Den (+ Swiftscaled + Fellskin's Venom)
-        [34626] = [Gauge(VprAnguineTribute, 5), Status(3670, 30f)],  // Reawaken (+ Reawakened)
+        [34647] = [Gauge(VprRattlingCoil, 1), Unlocks(34626, Status(3671, 30f))],   // Serpent's Ire (+ Ready to Reawaken)
+        [34610] = [ViperFinisher(3647)],  // Flanksting Strike (+ Hindstung Venom)
+        [34611] = [ViperFinisher(3648)],  // Flanksbane Fang (+ Hindsbane Venom)
+        [34612] = [ViperFinisher(3646)],  // Hindsting Strike (+ Flanksbane Venom)
+        [34613] = [ViperFinisher(3645)],  // Hindsbane Fang (+ Flankstung Venom)
+        [34618] = [ViperFinisher(3650)],  // Jagged Maw (+ Grimskin's Venom)
+        [34619] = [ViperFinisher(3649)],  // Bloodied Maw (+ Grimhunter's Venom)
+        [34621] = [Unlocks(34626, Gauge(VprSerpentOffering, 5)), Status(3668, 40f), Unlocks(34636, Status(3657, 30f))],   // Hunter's Coil (+ Hunter's Instinct + Hunter's Venom)
+        [34622] = [Unlocks(34626, Gauge(VprSerpentOffering, 5)), Status(3669, 40f), Unlocks(34637, Status(3658, 30f))],   // Swiftskin's Coil (+ Swiftscaled + Swiftskin's Venom)
+        [34624] = [Unlocks(34626, Gauge(VprSerpentOffering, 5)), Status(3668, 40f), Unlocks(34638, Status(3659, 30f))],   // Hunter's Den (+ Hunter's Instinct + Fellhunter's Venom)
+        [34625] = [Unlocks(34626, Gauge(VprSerpentOffering, 5)), Status(3669, 40f), Unlocks(34639, Status(3660, 30f))],   // Swiftskin's Den (+ Swiftscaled + Fellskin's Venom)
+        [34626] = [new BelowLevelEffect(ViperStateHandler.TributeUpgradeLevel, SetGauge(VprAnguineTribute, 4)), AtLevel(ViperStateHandler.TributeUpgradeLevel, SetGauge(VprAnguineTribute, 5)), Status(3670, 30f)],  // Reawaken (+ Reawakened)
         [34606] = [Status(3772, 60f)], [34614] = [Status(3772, 60f)],  // Steel Fangs/Maw → Honed Reavers
         [34607] = [Status(3672, 60f)], [34615] = [Status(3672, 60f)],  // Reaving Fangs/Maw → Honed Steel
-        [34608] = [Status(3668, 40f)], [34616] = [Status(3668, 40f)],  // Hunter's Sting/Bite → Hunter's Instinct
-        [34609] = [Status(3669, 40f)], [34617] = [Status(3669, 40f)],  // Swiftskin's Sting/Bite → Swiftscaled
-        [34633] = [Status(3665, 60f)], [34644] = [Status(3666, 60f)],  // Uncoiled Fury/Twinfang → Poised
+        [34608] = [Combo(Status(3668, 40f))], [34616] = [Combo(Status(3668, 40f))],  // Hunter's Sting/Bite → Hunter's Instinct
+        [34609] = [Combo(Status(3669, 40f))], [34617] = [Combo(Status(3669, 40f))],  // Swiftskin's Sting/Bite → Swiftscaled
+        [34633] = [Unlocks(34644, Status(3665, 60f))],  // Uncoiled Fury → Poised
 
         // WHM — Blood Lily only; casting these needs a Lily (passive gauge, not fed here)
-        [16531] = [Gauge(WhmBloodLily, 1)],   // Afflatus Solace
+        [121]   = [new DamageOverTimeEffect(143, 30f)],
+        [132]   = [new DamageOverTimeEffect(144, 30f)],
+        [16532] = [new DamageOverTimeEffect(1871, 30f)],
+        [7430]  = [Status(1217, 12f)],
+        [7432]  = [TargetStatus(1218, 15f)],
+        [7433]  = [TargetStatus(1219, 10f)],
+        [25861] = [TargetStatus(2708, 8f)],
+        [37011] = [TargetStatus(3903, 10f)],
+        [16531] = [AtLevel(74, Gauge(WhmBloodLily, 1))],   // Afflatus Solace
         [16534] = [Gauge(WhmBloodLily, 1)],   // Afflatus Rapture
-        [136]   = [Status(157, 15f), Status(3879, 30f, 3)],   // Presence of Mind → self-haste + Sacred Sight (3 stk)
-        [16536] = [Status(3881, 30f)],   // Temperance → Divine Grace (enables Divine Caress)
-        [120]   = [Random(0.15f, Status(155, 15f))],   // Cure → Freecure (15%)
+        [136]   = [Status(157, 15f), AtLevel(92, Status(3879, 30f, 3))],   // Presence of Mind → self-haste + Sacred Sight (3 stk)
+        [WhiteMageStateHandler.Temperance] = [Status(WhiteMageStateHandler.TemperanceHealing, 20f), AtLevel(100, Status(3881, 30f))],
+        [120]   = [AtLevel(32, Random(0.15f, Status(155, 15f)))],   // Cure → Freecure (15%)
 
         // DNC — Feathers only (50% procs); Esprit is buff-gated, not modelled
         // Esprit +5 per own damage GCD (base Esprit-trait rate; dance-partner contribution not modelled), +50 from Tillana.
@@ -517,10 +547,12 @@ internal static unsafe class JobActions
         [36984] = [Status(1821, 60f), Status(3867, 30f)],               // Finishing Move → Standard Finish + Last Dance Ready
 
         // PLD
-        [20]    = [Status(76, 20f), Status(3847, 30f)],      // Fight or Flight → dmg buff + Goring Blade Ready
-        [3539]  = [Combo(Status(1902, 30f), Status(2673, 30f))],    // Royal Authority → Atonement Ready + Divine Might (combo bonus)
-        [16457] = [Combo(Status(2673, 30f))],                       // Prominence → Divine Might (combo bonus)
-        [7383]  = [Status(1368, 30f, 4), Status(3019, 30f)], // Requiescat (4 stk) + Confiteor Ready
+        [23]    = [new DamageOverTimeEffect(248, 15f)],
+        [28]    = [Status(79, 0f)],                      // Iron Will
+        [20]    = [Status(76, 20f), AtLevel(54, Status(3847, 30f))],      // Fight or Flight → dmg buff + Goring Blade Ready
+        [3539]  = [Combo(AtLevel(76, Status(1902, 30f)), AtLevel(64, Status(2673, 30f)))],    // Royal Authority → Atonement Ready + Divine Might (combo bonus)
+        [16457] = [Combo(AtLevel(72, Status(2673, 30f)))],                       // Prominence → Divine Might (combo bonus)
+        [7383]  = [Status(1368, 30f, 4), AtLevel(80, Status(3019, 30f))], // Requiescat (4 stk) + Confiteor Ready
         [36921] = [Status(1368, 30f, 4), Status(3019, 30f)], // Imperator (Lv100 upgrade)
         [16460] = [Status(3827, 30f)],                       // Atonement → Supplication Ready
         [36918] = [Status(3828, 30f)],                       // Supplication → Sepulchre Ready
@@ -528,20 +560,20 @@ internal static unsafe class JobActions
         [16459] = [Gauge(PldConfiteorStep, 1)],              // Confiteor → step 1 (Blade of Faith)
         [25748] = [Gauge(PldConfiteorStep, 1)],              // Blade of Faith → step 2 (Blade of Truth)
         [25749] = [Gauge(PldConfiteorStep, 1)],              // Blade of Truth → step 3 (Blade of Valor)
-        [25750] = [Status(3831, 30f), Gauge(PldConfiteorStep, -3)], // Blade of Valor → Blade of Honor Ready (+ ends route)
+        [25750] = [AtLevel(100, Status(3831, 30f)), Gauge(PldConfiteorStep, -3)], // Blade of Valor → Blade of Honor Ready (+ ends route)
         // mitigation:
         [30]    = [Status(82, 10f)],                         // Hallowed Ground
-        [17]    = [Status(3829, 15f), Status(3830, 15f)], [36920] = [Status(3829, 15f), Status(3830, 15f)],   // Sentinel / Guardian → Guardian + Guardian's Will
+        [17]    = [Status(74, 15f)], [36920] = [Status(3829, 15f), Status(3830, 15f)],   // Sentinel / Guardian → Guardian + Guardian's Will
         [22]    = [Status(77, 10f)],                         // Bulwark
         [3540]  = [TargetStatus(1362, 30f)],                 // Divine Veil
-        [7382]  = [TargetStatus(1174, 8f)],                  // Intervention
-        [7385]  = [Status(1175, 18f)],                       // Passage of Arms
-        [3542]  = [Status(2674, 8f), Status(2675, 4f), Status(2676, 12f)],   // Sheltron → Holy Sheltron + Knight's Resolve + Knight's Benediction
+        [7382]  = [new Jobs.InterventionEffect()],                  // Intervention
+        [PaladinStateHandler.PassageAction] = [Status(PaladinStateHandler.PassageOfArms, 18f, PaladinStateHandler.PassageLoopTimeline)],
+        [3542]  = [new BelowLevelEffect(74, Status(1856, 4f)), AtLevel(74, Status(1856, 6f))],   // Sheltron → Holy Sheltron + Knight's Resolve + Knight's Benediction
         [25746] = [Status(2674, 8f), Status(2675, 4f), Status(2676, 12f)],   // Holy Sheltron
 
         // MNK
-        [7395]  = [Status(1181, 20f), Status(3843, 20f)],   // Riddle of Fire + Fire's Rumination
-        [25766] = [Status(2687, 15f), Status(3842, 15f)],   // Riddle of Wind + Wind's Rumination
+        [7395]  = [Status(1181, 20f), Unlocks(36950, Status(3843, 20f))],   // Riddle of Fire + Fire's Rumination
+        [25766] = [Status(2687, 15f), Unlocks(36949, Status(3842, 15f))],   // Riddle of Wind + Wind's Rumination
         [7396]  = [Status(1185, 20f), Status(1182, 20f)],   // Brotherhood + Meditative Brotherhood
         [69]    = [Status(110, 20f, 3)],                    // Perfect Balance (3 stk)
         [4262]  = [Status(2513, 30f)],                      // Form Shift → Formless Fist
@@ -608,27 +640,46 @@ internal static unsafe class JobActions
         [34685] = [Status(3686, 10f)],                      // Tempera Coat → self-status (enables Tempera Grassa)
 
         // SGE
-        [24290] = [Status(2606, 0f)],                     // Eukrasia (toggle, no-expiry)
-        [37035] = [Status(3898, 20f), Status(3899, 20f)], // Philosophia + Eudaimonia
+        [24293] = [new DamageOverTimeEffect(2614, 30f)],
+        [24308] = [new DamageOverTimeEffect(2615, 30f)],
+        [24314] = [new DamageOverTimeEffect(2616, 30f, 3897)],
+        [37032] = [new DamageOverTimeEffect(3897, 30f, 2616)],
+        [24288] = [TargetStatus(2617, 15f)],
+        [24302] = [TargetStatus(2620, 15f), TargetStatus(2621, 10f)],
+        [24317] = [TargetStatus(2622, 10f)],
+        [24300] = [Status(2611, 30f)],        [24291] = [new OwnedBarrierEffect(Jobs.SageStateHandler.DiagnosisBarrier)],
+        [24292] = [new OwnedBarrierEffect(Jobs.SageStateHandler.PrognosisBarrier)],
+        [37034] = [new OwnedBarrierEffect(Jobs.SageStateHandler.PrognosisBarrier)],
+        [24294] = [Status(2610, 15f, 4)],
+        [24298] = [new TargetStatusEffect(2618, 15f, incompatible: 2619)],
+        [24303] = [new TargetStatusEffect(2619, 15f, incompatible: 2618)],
+        [24305] = [TargetStatus(2612, 15f), TargetStatus(2642, 15f, 5)],
+        [24311] = [TargetStatus(2613, 15f), TargetStatus(2643, 15f, 5)],
+        [24310] = [TargetStatus(3003, 20f), TargetStatus(3365, 30f)],
+        [37035] = [Status(3898, 20f), TargetStatus(3899, 20f)], // Philosophia + Eudaimonia
         [24309] = [Gauge(SgeAddersgall, 1)],              // Rhizomata → +1 Addersgall (passive fill in TimedGauges)
     };
 
     // What one landed auto-attack swing does, per job.
     private static readonly Dictionary<JobId, IActionEffect[]> AutoAttacks = new()
     {
-        [JobId.Paladin] = [Gauge(PldOath, 5)],   // Oath Mastery
+        [JobId.Paladin] = [AtLevel(35, Gauge(PldOath, 5))],   // Oath Mastery
     };
 
     // The resources the player holds when a scenario starts. Phases start mid-fight, so the
     // server-built resources a player would walk in with are seeded here.
     private static readonly Dictionary<JobId, IActionEffect[]> StartingResources = new()
     {
-        [JobId.Paladin] = [SetGauge(PldOath, 100)],
+        [JobId.Paladin] = [AtLevel(35, SetGauge(PldOath, 100))],
+        [JobId.WhiteMage] = [AtLevel(52, SetGauge(WhmLily, 3)), AtLevel(74, SetGauge(WhmBloodLily, 3))],
+        [JobId.Sage] = [AtLevel(45, SetGauge(SgeAddersgall, 3)), AtLevel(66, SetGauge(SgeAddersting, 3))],
     };
 
     // status → predicates that clear it. OR-semantics: any match removes the status. The
     // dispatcher runs this BEFORE the action's effects, so a line action re-grants after
     // its own weaponskill clear.
+    private static readonly IActionPredicate[] ViperFinisherConsumes = [new ViperBasicFinisherPredicate()];
+
     private static readonly Dictionary<ushort, IActionPredicate[]> StatusClearedOnAction = new()
     {
         [1842] = [ActionId(16156), AnyWeaponskill()],   // Ready to Rip:   Jugular Rip   or any WS
@@ -639,12 +690,13 @@ internal static unsafe class JobActions
         [3840] = [ActionId(36937)],                     // Ready to Reign: Reign of Beasts
         [3886] = [ActionId(16153)],                     // Ready to Break: Sonic Break
         // PLD
+        [79] = [ActionId(32065)],
         [3847] = [ActionId(3538)], [1902] = [ActionId(16460)], [2673] = [ActionId(7384), ActionId(16458)],
         [3827] = [ActionId(36918)], [3828] = [ActionId(36919)], [3019] = [ActionId(16459)], [3831] = [ActionId(36922)],
         // WAR
+        [91] = [ActionId(32066)], [86] = [AnyWeaponskill()], [3901] = [ActionId(36924)],
         [1177] = [ActionId(3549), ActionId(3550)], [1897] = [ActionId(16465), ActionId(16463)],
         [2624] = [ActionId(25753)], [3834] = [ActionId(36925)],
-        [87] = [ActionId(7388)], [3832] = [ActionId(7388)], [2678] = [ActionId(7388)],   // Shake It Off dispels Thrill of Battle / Damnation / Bloodwhetting
         // DRK
         [3836] = [ActionId(36928), ActionId(36929), ActionId(36930), ActionId(36931)], [742] = [AnyGcd()],
         [3837] = [ActionId(36932)], [752] = [ActionId(16470), ActionId(16469), ActionId(16467), ActionId(16466)],
@@ -663,13 +715,13 @@ internal static unsafe class JobActions
         [2587] = [ActionId(24382), ActionId(24383), ActionId(24384)], [2588] = [ActionId(24382), ActionId(36970)],
         [2589] = [ActionId(24383), ActionId(36971)], [2590] = [ActionId(24395)], [2591] = [ActionId(24396)],
         [2593] = [ActionId(24398)], [3857] = [ActionId(36969)], [3858] = [ActionId(36970), ActionId(36971), ActionId(36972)],
-        [2594] = [ActionId(24388)], [2845] = [ActionId(24386)], [2595] = [ActionId(24403)], [3905] = [ActionId(24394)],
-        [3859] = [ActionId(24398)], [3860] = [ActionId(36973)],
+        [2594] = [ActionId(24388)], [2845] = [ActionId(24386)], [ReaperStateHandler.Threshold] = [ActionId(ReaperStateHandler.Regress)], [3905] = [ActionId(24394)],
+        [3859] = [ActionId(24398)], [3860] = [ActionId(36973), ActionId(24394)],
         // RDM
         [1234] = [ActionId(7510)], [1235] = [ActionId(7511)], [1238] = [ActionId(25855), ActionId(25856), ActionId(16526)],
         [3877] = [ActionId(37006)], [3876] = [ActionId(37005)], [3878] = [ActionId(37007)],
         // MCH
-        [851] = [AnyWeaponskill()], [2688] = [ActionId(36978), ActionId(16497)],
+        [851] = [new AnyWeaponskillPredicate(36982)], [2688] = [ActionId(7410), ActionId(36978), ActionId(16497)],
         [3864] = [ActionId(17209)], [3866] = [ActionId(36982)], [3865] = [ActionId(36981)], [1946] = [ActionId(16766)], // Wildfire consumed by Detonator
         // BRD
         [3861] = [ActionId(7409), ActionId(16494), ActionId(36974)], [1407] = [ActionId(7409), ActionId(16494), ActionId(36974)],
@@ -689,17 +741,20 @@ internal static unsafe class JobActions
         [3867] = [ActionId(36983)], [3868] = [ActionId(36984)], [3869] = [ActionId(36985)],
         [1818] = [ActionId(16003)], [1819] = [ActionId(16004)],
         // WHM / SCH / SGE
+        [2611] = [ActionId(24284), ActionId(24286), ActionId(24291), ActionId(24292), ActionId(24318), ActionId(37034)],
         [3879] = [ActionId(37009)],
         [3881] = [ActionId(37011)],   // Divine Grace: consumed by Divine Caress
         [155]  = [ActionId(135)],     // Freecure: consumed by Cure II
 
         [3882] = [ActionId(37012)], [1896] = [ActionId(185), ActionId(37013), ActionId(3583), ActionId(7434), ActionId(37015), ActionId(37016)],
-        [2606] = [ActionId(24314), ActionId(37032), ActionId(24291), ActionId(37034)],
         // VPR
         [3772] = [ActionId(34607), ActionId(34615)], [3672] = [ActionId(34606), ActionId(34614)],
-        [3645] = [ActionId(34610)], [3646] = [ActionId(34611)], [3647] = [ActionId(34612)], [3648] = [ActionId(34613)],
-        [3649] = [ActionId(34618)], [3650] = [ActionId(34619)], [3657] = [ActionId(34636)], [3658] = [ActionId(34637)],
-        [3659] = [ActionId(34638)], [3660] = [ActionId(34639)], [3665] = [ActionId(34644)], [3666] = [ActionId(34645)],
+        [3645] = ViperFinisherConsumes, [3646] = ViperFinisherConsumes, [3647] = ViperFinisherConsumes,
+        [3648] = ViperFinisherConsumes, [3649] = ViperFinisherConsumes, [3650] = ViperFinisherConsumes,
+        // The Viper handler consumes the follow-up statuses after reading them in press order.
+        [3657] = [ActionId(34622), ActionId(34620)], [3658] = [ActionId(34621), ActionId(34620)],
+        [3659] = [ActionId(34625), ActionId(34623)], [3660] = [ActionId(34624), ActionId(34623)],
+        [3665] = [ActionId(34633)], [3666] = [ActionId(34633)],
         [3670] = [ActionId(34631)], [3671] = [ActionId(34626)],
         // PCT
         [3675] = [ActionId(34651), ActionId(34657), ActionId(34654), ActionId(34660)],
@@ -729,6 +784,52 @@ internal static unsafe class JobActions
     public static void ApplyAutoAttack(SimCharacter caster, uint actionId, ulong targetId, System.Random rng)
         => ApplyJobEffects(AutoAttacks, caster, actionId, targetId, rng);
 
+    internal static void ApplyStartingGauges(IReadOnlyDictionary<StartingResource, int> resources, TimedGaugeHandler timers)
+    {
+        using var edit = JobGaugeEdit.Begin();
+        if (edit.Gauge == null) return;
+        foreach (var (resource, value) in resources)
+        {
+            var gauge = resource switch
+            {
+                StartingResource.Lilies => WhmLily,
+                StartingResource.BloodLily => WhmBloodLily,
+                StartingResource.Addersgall => SgeAddersgall,
+                StartingResource.Addersting => SgeAddersting,
+                StartingResource.Beast => WarBeast,
+                StartingResource.Oath => PldOath,
+                StartingResource.Soul => RprSoul,
+                StartingResource.Shroud => RprShroud,
+                StartingResource.RattlingCoils => VprRattlingCoil,
+                StartingResource.SerpentOffering => VprSerpentOffering,
+                StartingResource.Heat => MchHeat,
+                StartingResource.Battery => MchBattery,
+                StartingResource.ConfiteorStep => PldConfiteorStep,
+                StartingResource.LemureShroud => RprLemureShroud,
+                StartingResource.VoidShroud => RprVoidShroud,
+                StartingResource.AnguineTribute => VprAnguineTribute,
+                _ => null,
+            };
+            gauge?.Write(edit.Gauge, value);
+        }
+
+        if (resources.TryGetValue(StartingResource.MachinistSummonSeconds, out var summonSeconds) && summonSeconds > 0)
+        {
+            var deployedAt = Math.Clamp(resources.GetValueOrDefault(StartingResource.MachinistSummonBattery), 50, 100);
+            Jobs.MachinistStateHandler.WriteSummon(edit.Gauge, summonSeconds, (byte)deployedAt);
+        }
+        foreach (var gauge in TimedGauges)
+        {
+            if (gauge.Job != PlayerJob.Current) continue;
+            if (gauge.Job == JobId.WhiteMage && resources.TryGetValue(StartingResource.LilyProgress, out var lilies))
+                timers.Seed(gauge, edit.Gauge, lilies);
+            if (gauge.Job == JobId.Sage && resources.TryGetValue(StartingResource.AddersgallProgress, out var gall))
+                timers.Seed(gauge, edit.Gauge, gall);
+            if (gauge.Job == JobId.Paladin && resources.TryGetValue(StartingResource.ConfiteorTime, out var comboTime))
+                timers.SeedDecay(gauge, edit.Gauge, comboTime);
+        }
+    }
+
     public static void ApplyStartingResources(SimCharacter caster, System.Random rng)
         => ApplyJobEffects(StartingResources, caster, 0, 0, rng);
 
@@ -744,9 +845,13 @@ internal static unsafe class JobActions
     // → 0 → removed), so both cases fall out of one call.
     public static void ClearStatuses(SimPlayer player, uint actionId)
     {
+        var usesDivineMight = JobActionHandler.UsesDivineMight(actionId, player);
         foreach (var (statusId, predicates) in StatusClearedOnAction)
+        {
+            if (statusId == 1368 && usesDivineMight) continue;
             foreach (var predicate in predicates)
                 if (predicate.Matches(actionId)) { player.AddStatus(statusId, 0f, -1); break; }
+        }
     }
 
     // (job, Action-sheet PrimaryCostType) → the gauge(s) an action spends; PrimaryCostValue is
@@ -774,14 +879,27 @@ internal static unsafe class JobActions
     // Generic spender pass: subtract an action's gauge cost, read straight from the sheet.
     public static void ApplyCost(uint actionId)
     {
+        var job = PlayerJob.Current;
+        if (job == JobId.Sage && SageStateHandler.IsToxikon(actionId) && Plugin.Config.UnlimitedToxikon) return;
+
         var sheet = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Action>();
         if (!sheet.TryGetRow(actionId, out var row)) return;
-        if (!CostGauges.TryGetValue((PlayerJob.Current, (uint)row.PrimaryCostType), out var gauges)) return;
+        if (!CostGauges.TryGetValue((job, (uint)row.PrimaryCostType), out var gauges)) return;
         int amount = row.PrimaryCostValue;
         if (amount <= 0) return;
         using var edit = JobGaugeEdit.Begin();
         if (edit.Gauge == null) return;
-        foreach (var gauge in gauges) gauge.Add(edit.Gauge, -amount);
+        foreach (var gauge in gauges)
+        {
+            if (job == JobId.Machinist && actionId is 2864 or 16501) gauge.Write(edit.Gauge, 0);
+            else gauge.Add(edit.Gauge, -amount);
+        }
+    }
+
+    internal static void ClearPaladinConfiteorCombo()
+    {
+        using var edit = JobGaugeEdit.Begin();
+        if (edit.Gauge != null) PldConfiteorStep.Write(edit.Gauge, 0);
     }
 
     private static IActionEffect Gauge(ResourceGauge gauge, int amount) => new GaugeEffect(gauge, amount);
@@ -789,7 +907,13 @@ internal static unsafe class JobActions
     private static IActionEffect Status(ushort statusId, float duration, int stacks = 0) => new StatusEffect(statusId, duration, stacks);
     private static IActionEffect TargetStatus(ushort statusId, float duration, int stacks = 0) => new TargetStatusEffect(statusId, duration, stacks);
     private static IActionEffect EnemyStatus(ushort statusId, float duration, int stacks = 0) => new EnemyStatusEffect(statusId, duration, stacks);
+    private static IActionEffect Unlocks(uint actionId, params IActionEffect[] inner) => new UnlocksEffect(actionId, inner);
+    private static IActionEffect AtLevel(int level, params IActionEffect[] inner) => new LevelEffect(level, inner);
+    private static IActionEffect Extend(ushort statusId, float seconds, float max, bool existingOnly = false)
+        => new StatusExtensionEffect(statusId, seconds, max, existingOnly);
+    private static IActionEffect Refund(float seconds, params uint[] actions) => new RecastReductionEffect(seconds, actions);
     private static IActionEffect Combo(params IActionEffect[] inner) => new ComboEffect(inner);
+    private static IActionEffect ViperFinisher(ushort venom) => Combo(Unlocks(34626, Gauge(VprSerpentOffering, 10)), Status(venom, 60f));
     private static IActionEffect Random(float chance, params IActionEffect[] inner) => new RandomEffect(chance, inner);
 
     private static IActionPredicate ActionId(uint id) => new ActionIdPredicate(id);

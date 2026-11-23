@@ -279,4 +279,3 @@ internal sealed class UmadP5FullExaflaresAi
     }
     private static Vector2 Spoke(int slot) => new(MathF.Cos(slot * 0.785f), MathF.Sin(slot * 0.785f));
 }
-

@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Authors>Anomek</Authors>
     <AssemblyName>AnomechJobs</AssemblyName>
-    <Version>0.1.0.0</Version>
+    <Version>0.2.0.0</Version>
     <Description>Simulate ultimate raid mechanics solo client-side</Description>
     <RootNamespace>AnoMech</RootNamespace>
     <PackageProjectUrl>https://github.com/chrono414/AnomechJobs</PackageProjectUrl>

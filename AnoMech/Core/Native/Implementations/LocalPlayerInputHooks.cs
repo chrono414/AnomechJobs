@@ -269,6 +269,7 @@ public sealed unsafe class LocalPlayerInputHooks : ILocalPlayerInput
         var before = PlayerActionTrace.Active && actionType == ActionType.Action ? PlayerActionTrace.Snapshot(self) : null;
 #endif
         var beforeSequence = self->LastUsedActionSequence;
+        var origin = Plugin.ObjectTable.LocalPlayer?.Position;
         var result = useActionHook.Original(self, actionType, actionId, targetId, extraParam, mode, comboRouteId, outOptAreaTargeted);
         var afterSequence = self->LastUsedActionSequence;
 #if DEBUG
@@ -280,7 +281,7 @@ public sealed unsafe class LocalPlayerInputHooks : ILocalPlayerInput
             actionUsedSincePoll = true;
             // A successful press may only have added an entry to the queue.
             if (afterSequence != beforeSequence)
-                ActionExecuted?.Invoke(new LocalActionExecution(actionType, ran, targetId, null, afterSequence));
+                ActionExecuted?.Invoke(new LocalActionExecution(actionType, ran, targetId, null, afterSequence) { Origin = origin });
         }
         return result;
     }
@@ -293,6 +294,7 @@ public sealed unsafe class LocalPlayerInputHooks : ILocalPlayerInput
         var before = PlayerActionTrace.Active && actionType == ActionType.Action ? PlayerActionTrace.Snapshot(self) : null;
 #endif
         var beforeSequence = self->LastUsedActionSequence;
+        var origin = Plugin.ObjectTable.LocalPlayer?.Position;
         var result = useActionLocationHook.Original(self, actionType, actionId, targetId, location, extraParam, a7);
         var afterSequence = self->LastUsedActionSequence;
 #if DEBUG
@@ -303,7 +305,7 @@ public sealed unsafe class LocalPlayerInputHooks : ILocalPlayerInput
         {
             actionUsedSincePoll = true;
             if (afterSequence != beforeSequence)
-                ActionExecuted?.Invoke(new LocalActionExecution(actionType, ran, targetId, executedLocation, afterSequence));
+                ActionExecuted?.Invoke(new LocalActionExecution(actionType, ran, targetId, executedLocation, afterSequence) { Origin = origin });
         }
         return result;
     }

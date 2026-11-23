@@ -43,7 +43,7 @@ public unsafe class MainWindow : Window, IDisposable
 
     private readonly Plugin plugin;
     private readonly TitleBarButton autoCollapseButton;
-    private IZone? _openZone;
+    private string? _openCategory;
     internal ScenarioPanelWindow ScenarioPanel { get; }
     internal PartyPanelWindow PartyPanel { get; }
     private readonly MultiplayerUi multiplayerUi;
@@ -317,12 +317,11 @@ public unsafe class MainWindow : Window, IDisposable
     {
         var style = ImGui.GetStyle();
         var widest = 0f;
-        foreach (var zone in Plugin.Game.Catalog.Zones)
+        foreach (var category in Plugin.Game.Catalog.Categories)
         {
-            widest = Math.Max(widest, ImGui.CalcTextSize(zone.Name).X + style.IndentSpacing);
-            foreach (var phase in Plugin.Game.Catalog.PhasesOf(zone))
-                foreach (var scenario in Plugin.Game.Catalog.ScenariosOf(phase))
-                    widest = Math.Max(widest, ImGui.CalcTextSize(scenario.DisplayName()).X + style.IndentSpacing);
+            widest = Math.Max(widest, ImGui.CalcTextSize(category.Key).X + style.IndentSpacing);
+            foreach (var scenario in category)
+                widest = Math.Max(widest, ImGui.CalcTextSize(scenario.DisplayName()).X + style.IndentSpacing);
         }
         var measured = widest
             + style.FramePadding.X * 2
@@ -337,21 +336,22 @@ public unsafe class MainWindow : Window, IDisposable
     {
         // Switching scenarios inside a loaded zone skips the zone reload, so another zone's
         // scenario would run on the wrong territory.
-        var lockedZone = Plugin.Game.World.Map.IsInInstance ? _selectedScenario?.Phase.Zone : null;
-        ImGui.TextUnformatted(lockedZone?.Name ?? "Scenarios");
+        var game = Plugin.Game;
+        var lockedZone = game.Zone;
+        ImGui.TextUnformatted(lockedZone != null ? _selectedScenario?.Category ?? lockedZone.Name : "Scenarios");
         ImGui.Separator();
 
         if (lockedZone != null)
         {
             var right = ImGui.GetCursorScreenPos().X + ImGui.GetContentRegionAvail().X;
-            DrawZoneScenarios(lockedZone, right);
+            DrawScenarioList(game.Catalog.Scenarios.Where(scenario => scenario.Phase.Zone == lockedZone), right);
             return;
         }
-        foreach (var zone in Plugin.Game.Catalog.Zones)
+        foreach (var category in game.Catalog.Categories)
         {
-            var shouldOpen = _openZone == zone;
+            var shouldOpen = _openCategory == category.Key;
             ImGui.SetNextItemOpen(shouldOpen, ImGuiCond.Always);
-            var containsSelection = ZoneContains(zone, _selectedScenario);
+            var containsSelection = _selectedScenario?.Category == category.Key;
             var headerColor = BlendColor(
                 StyleColor(ImGuiCol.WindowBg),
                 StyleColor(ImGuiCol.Header),
@@ -360,19 +360,19 @@ public unsafe class MainWindow : Window, IDisposable
                 containsSelection ? BlendColor(headerColor, SelectionColor, 0.58f) : headerColor);
             ImGui.PushStyleColor(ImGuiCol.HeaderHovered, containsSelection ? SelectionHoveredColor : HoverColor);
             ImGui.PushStyleColor(ImGuiCol.HeaderActive, SelectionActiveColor);
-            var open = ImGui.CollapsingHeader($"{zone.Name}###scenario-zone-{zone.GetType().FullName}");
+            var open = ImGui.CollapsingHeader($"{category.Key}###scenario-category-{category.Key}");
             ImGui.PopStyleColor(3);
             if (containsSelection) DrawSelectionAccent();
             var sectionRight = ImGui.GetItemRectMax().X;
-            if (open != shouldOpen) _openZone = open ? zone : null;
+            if (open != shouldOpen) _openCategory = open ? category.Key : null;
             if (!open) continue;
             ImGui.Indent();
-            DrawZoneScenarios(zone, sectionRight);
+            DrawScenarioList(category, sectionRight);
             ImGui.Unindent();
         }
     }
 
-    private void DrawZoneScenarios(IZone zone, float sectionRight)
+    private void DrawScenarioList(IEnumerable<IScenario> scenarios, float sectionRight)
     {
         var inSession = InSession;
         var guest = IsGuest;
@@ -380,35 +380,34 @@ public unsafe class MainWindow : Window, IDisposable
         buttonPadding.X += ScenarioButtonExtraPadding * ImGuiHelpers.GlobalScale;
         ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, buttonPadding);
         ImGui.PushStyleVar(ImGuiStyleVar.ButtonTextAlign, new Vector2(0f, 0.5f));
-        foreach (var phase in Plugin.Game.Catalog.PhasesOf(zone))
-            foreach (var scenario in Plugin.Game.Catalog.ScenariosOf(phase))
+        foreach (var scenario in scenarios)
+        {
+            var selected = _selectedScenario == scenario;
+            var mpUnsupported = inSession && !scenario.SupportsMultiplayer;
+            if (selected) PushSelectedScenarioStyle();
+            else PushScenarioHoverStyle();
+            // Category-qualified: two zones can hold same-named scenarios (UMAD and UCOB
+            // both have a P5 "Exaflares"), and a shared ImGui id makes the second
+            // button unclickable.
+            ImGui.PushID(scenario.FullName());
+            var buttonWidth = sectionRight - ImGui.GetCursorScreenPos().X;
+            ImGui.BeginDisabled(mpUnsupported || guest);
+            var clicked = ImGui.Button(scenario.DisplayName(), new Vector2(buttonWidth, 0));
+            ImGui.EndDisabled();
+            if ((mpUnsupported || guest) && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                ImGui.SetTooltip(guest ? "The host picks the scenario." : "This scenario doesn't support multiplayer.");
+            if (selected)
             {
-                var selected = _selectedScenario == scenario;
-                var mpUnsupported = inSession && !scenario.SupportsMultiplayer;
-                if (selected) PushSelectedScenarioStyle();
-                else PushScenarioHoverStyle();
-                // Zone-qualified: two zones can hold same-named scenarios (UMAD and UCOB
-                // both have a P5 "Exaflares"), and a shared ImGui id makes the second
-                // button unclickable.
-                ImGui.PushID(scenario.FullName());
-                var buttonWidth = sectionRight - ImGui.GetCursorScreenPos().X;
-                ImGui.BeginDisabled(mpUnsupported || guest);
-                var clicked = ImGui.Button(scenario.DisplayName(), new Vector2(buttonWidth, 0));
-                ImGui.EndDisabled();
-                if ((mpUnsupported || guest) && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-                    ImGui.SetTooltip(guest ? "The host picks the scenario." : "This scenario doesn't support multiplayer.");
-                if (selected)
-                {
-                    DrawSelectionAccent();
-                    ImGui.PopStyleColor(3);
-                }
-                else
-                {
-                    ImGui.PopStyleColor(2);
-                }
-                ImGui.PopID();
-                if (clicked) SelectScenario(scenario);
+                DrawSelectionAccent();
+                ImGui.PopStyleColor(3);
             }
+            else
+            {
+                ImGui.PopStyleColor(2);
+            }
+            ImGui.PopID();
+            if (clicked) SelectScenario(scenario);
+        }
         ImGui.PopStyleVar(2);
     }
 
@@ -434,7 +433,7 @@ public unsafe class MainWindow : Window, IDisposable
             _waymarkMemory[previousScenario.Phase.Zone] = _selectedWaymark;
 
         _selectedScenario = scenario;
-        _openZone = scenario.Phase.Zone;
+        _openCategory = scenario.Category;
         _soloMode = false;
         _selectedStrat = 0;
         _selectedWaymark = _waymarkMemory.GetValueOrDefault(scenario.Phase.Zone);
@@ -651,7 +650,7 @@ public unsafe class MainWindow : Window, IDisposable
 
         DrawScenarioPanelToggle();
         ImGui.SameLine();
-        ImGui.TextDisabled($"{scenario.Phase.Zone.Name} —");
+        ImGui.TextDisabled($"{scenario.Category} —");
         ImGui.SameLine(0f, 4f * uiScale);
         ImGui.TextUnformatted(scenario.DisplayName());
         DrawRunStatus(game);
@@ -866,9 +865,6 @@ public unsafe class MainWindow : Window, IDisposable
             ImGui.GetColorU32(SelectionColor));
     }
 
-    private bool ZoneContains(IZone zone, IScenario? scenario) =>
-        scenario != null && Plugin.Game.Catalog.PhasesOf(zone).Any(p => Plugin.Game.Catalog.ScenariosOf(p).Contains(scenario));
-
     private static Vector4 StyleColor(ImGuiCol color) => *ImGui.GetStyleColorVec4(color);
 
     private static Vector4 BlendColor(Vector4 from, Vector4 to, float amount) =>
@@ -882,7 +878,7 @@ public unsafe class MainWindow : Window, IDisposable
 
     private void DrawSoloOption(AnoMech.Core.Game.Game game)
     {
-        if (!_selectedScenario!.SupportsSolo) return;
+        if (!_selectedScenario!.SupportsSolo || _selectedScenario.IsSoloOnly()) return;
         var running = RunLive(game);
         ImGui.BeginDisabled(running);
         ImGui.Checkbox("Solo", ref _soloMode);
@@ -1018,6 +1014,7 @@ public unsafe class MainWindow : Window, IDisposable
     private bool HasStartableStrat()
     {
         if (_selectedScenario is not { } scenario) return false;
+        if (scenario.IsSoloOnly()) return false;
         if (StratGroups(scenario).Count == 0) return true;
         var strats = scenario.AiStrats;
         return _selectedStrat >= 0 && _selectedStrat < strats.Count

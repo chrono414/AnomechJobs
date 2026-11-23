@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using AnoMech.Scenarios.Dummies;
 using AnoMech.Scenarios.Fru.P2DiamondDust;
 using AnoMech.Scenarios.Fru.P2LightRampant;
 using AnoMech.Scenarios.Fru.P3Apocalypse;
@@ -30,46 +31,17 @@ using AnoMech.Scenarios.Uwu.UltimateSuppression;
 
 namespace AnoMech.Scenarios;
 
-// Every runnable scenario, in menu order, plus the zone -> phase -> scenario tree derived from it in
-// first-appearance order. Fresh instances per Create: a scenario holds its run state.
+// First-appearance order is also the menu order. Keep scenario indices stable for multiplayer.
 public sealed class ScenarioCatalog
 {
     public IReadOnlyList<IScenario> Scenarios { get; }
-    public IReadOnlyList<IZone> Zones { get; }
-    private readonly Dictionary<IZone, IReadOnlyList<IPhase>> phasesByZone;
-    private readonly Dictionary<IPhase, IReadOnlyList<IScenario>> scenariosByPhase;
+    public IReadOnlyList<IGrouping<string, IScenario>> Categories { get; }
 
     private ScenarioCatalog(IReadOnlyList<IScenario> scenarios)
     {
         Scenarios = scenarios;
-        var zones = new List<IZone>();
-        var phases = new Dictionary<IZone, List<IPhase>>();
-        var byPhase = new Dictionary<IPhase, List<IScenario>>();
-        foreach (var scenario in scenarios)
-        {
-            var phase = scenario.Phase;
-            var zone = phase.Zone;
-            if (!phases.TryGetValue(zone, out var zonePhases))
-            {
-                zonePhases = [];
-                phases[zone] = zonePhases;
-                zones.Add(zone);
-            }
-            if (!zonePhases.Contains(phase)) zonePhases.Add(phase);
-            if (!byPhase.TryGetValue(phase, out var phaseScenarios))
-            {
-                phaseScenarios = [];
-                byPhase[phase] = phaseScenarios;
-            }
-            phaseScenarios.Add(scenario);
-        }
-        Zones = zones;
-        phasesByZone = phases.ToDictionary(kv => kv.Key, IReadOnlyList<IPhase> (kv) => kv.Value);
-        scenariosByPhase = byPhase.ToDictionary(kv => kv.Key, IReadOnlyList<IScenario> (kv) => kv.Value);
+        Categories = scenarios.GroupBy(scenario => scenario.Category).ToArray();
     }
-
-    public IReadOnlyList<IPhase> PhasesOf(IZone zone) => phasesByZone[zone];
-    public IReadOnlyList<IScenario> ScenariosOf(IPhase phase) => scenariosByPhase[phase];
 
     public static ScenarioCatalog Create() => new(
     [
@@ -100,5 +72,6 @@ public sealed class ScenarioCatalog
         new UltimatePredationScenario(),
         new UltimateSuppressionScenario(),
         new UcobP5ExaflaresScenario(),
+        new Level100DummyScenario(),
     ]);
 }

@@ -40,4 +40,5 @@ public enum JobId : uint
 internal static class PlayerJob
 {
     public static JobId Current => (JobId)Plugin.PlayerState.ClassJob.RowId;
+    public static int Level => Plugin.ObjectTable.LocalPlayer?.Level ?? 0;
 }

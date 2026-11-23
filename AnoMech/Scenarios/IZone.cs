@@ -6,14 +6,14 @@ using AnoMech.Core.SimObjects;
 
 namespace AnoMech.Scenarios;
 
-// A raid territory: the identity every scenario inside it shares. Authored bottom-up —
-// scenarios point at their IPhase, phases point here — and ScenarioCatalog derives the downward
-// zone -> phase -> scenario view for the menu.
+// A raid territory and its instance setup. Scenarios reach it through their phase.
 public interface IZone
 {
     string Name { get; }
     uint TerritoryId { get; }
     Vector3 Origin { get; }
+    // Rotation practice uses this player level and keeps the equipped gear's stats.
+    byte? PracticeLevel => null;
 
     // At least one; [0] is the default.
     IReadOnlyList<WaymarkLayout> WaymarkPresets { get; }

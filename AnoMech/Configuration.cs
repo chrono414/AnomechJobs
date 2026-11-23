@@ -14,6 +14,8 @@ public class Configuration : IPluginConfiguration
     public int Version { get; set; } = 0;
 
     public Dictionary<int, StartingStatePresets<BlackMageStartingState>> BlackMageStartingPresets { get; set; } = [];
+    public Dictionary<JobId, Dictionary<int, StartingStatePresets<CombatStartingState>>> CombatStartingPresets { get; set; } = [];
+    public bool UnlimitedToxikon { get; set; }
 
     
     public bool OpenSimMenuOnInn { get; set; } = true;

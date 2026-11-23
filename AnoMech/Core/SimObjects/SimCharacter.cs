@@ -25,6 +25,7 @@ public abstract class SimCharacter : ISimObject, IPositioned
 
     // Authoritative list of statuses for character. In-game status list can be be little different and it's ok by design.
     private readonly List<SimStatus> statusList = [];
+    private List<ushort>? expiredStatuses;
 
     // Null once the character has no native object to stand for (despawned).
     internal abstract IBattleCharaProxy? Proxy { get; }
@@ -49,6 +50,11 @@ public abstract class SimCharacter : ISimObject, IPositioned
     public virtual void Tick(float deltaSeconds)
     {
         statusList.Update(deltaSeconds);
+        if (expiredStatuses is { Count: > 0 } expired)
+        {
+            foreach (var statusId in expired) Natives.UserActions?.OnStatusExpired(this, statusId);
+            expired.Clear();
+        }
         FlushStatusList();
         Casting.Tick(deltaSeconds);
         Motion.Tick(deltaSeconds, new MotionGates(this.IsAlive(), MovementLocked, AnimationLock));
@@ -73,10 +79,13 @@ public abstract class SimCharacter : ISimObject, IPositioned
     // Set by whoever seats or spawns the character in a world.
     internal SimEvents? SimEvents { get; set; }
 
+    internal void QueueStatusExpiry(ushort statusId) => (expiredStatuses ??= []).Add(statusId);
+
     private void EndStatuses(StatusLossReason? reason)
     {
         foreach (var status in statusList) status.End(reason);
         statusList.Clear();
+        expiredStatuses?.Clear();
     }
 
     // -------------------------
@@ -245,9 +254,9 @@ public abstract class SimCharacter : ISimObject, IPositioned
     // For logging: the party role when available, else the type name.
     private string DiagnosticName => (this as ISimPartyMember)?.Role.ToString() ?? GetType().Name;
 
-    public SimStatus AddStatusParam(ushort statusId, int param, float duration = 0f)
+    public SimStatus AddStatusParam(ushort statusId, int param, float duration = 0f, GameObjectId sourceObject = default)
     {
-        var added = SpawnStatus(statusId, duration, (ushort)param, default, broadcastAddEvent: true, hidden: false);
+        var added = SpawnStatus(statusId, duration, (ushort)param, sourceObject, broadcastAddEvent: true, hidden: false);
         RaiseStatusAdded(added, 0, appliedBy: null);
         return added;
     }
@@ -305,7 +314,7 @@ public abstract class SimCharacter : ISimObject, IPositioned
         foreach (var status in statusList)
             if (status.IsActive && status.Slot >= 0 && !status.Hidden)
                 slots[status.Slot] = new StatusSlot(status.StatusId, status.Stacks, status.RemainingTime, (status.ShownSource ?? status.SourceObject).ObjectId);
-        var shield = Mitigation.ShieldFraction(statusList.Where(s => s.IsActive).Select(s => s.StatusId));
+        var shield = Mitigation.ShieldFraction(statusList.Where(s => s.IsActive));
         chara.ReceiveStatusList(slots, health, mana, (byte)Math.Clamp(shield * 100f, 0f, 100f));
     }
 
@@ -377,7 +386,7 @@ public abstract class SimCharacter : ISimObject, IPositioned
     }
 
     // Split from PlayDeath for a death the client animates later than the server records it.
-    protected bool MarkDead()
+    protected virtual bool MarkDead()
     {
         if (Dead) return false;
         Dead = true;

@@ -39,4 +39,8 @@ public interface ILocalPlayerInput : IDisposable
 }
 
 public readonly record struct LocalActionExecution(
-    ActionType Type, uint ActionId, ulong TargetId, Vector3? Location, ushort Sequence);
+    ActionType Type, uint ActionId, ulong TargetId, Vector3? Location, ushort Sequence)
+{
+    // World position before the client starts moving for the action.
+    public Vector3? Origin { get; init; }
+}

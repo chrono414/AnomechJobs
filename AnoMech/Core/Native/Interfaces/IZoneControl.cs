@@ -21,8 +21,8 @@ public interface IZoneControl : IDisposable
     void TickGuard();
 
     // False when refused; nothing is loaded then. The player is synced to the duty's level and
-    // item level.
-    bool Enter(uint territoryId, Vector3 playerSpawn);
+    // item level unless a practice level is supplied.
+    bool Enter(uint territoryId, Vector3 playerSpawn, byte? practiceLevel = null);
 
     // Back to the inn territory and position.
     void Revert();

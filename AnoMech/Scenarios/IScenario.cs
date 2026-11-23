@@ -13,6 +13,7 @@ public interface IScenario : IWorldEventListener
 
     // Its phase — usually `=> TopZone.P5`.
     IPhase Phase { get; }
+    string Category => Phase.Zone.Name;
 
     bool SupportsSolo => false;
 
@@ -58,6 +59,8 @@ public interface IScenario : IWorldEventListener
 
 public static class ScenarioExtensions
 {
+    public static bool IsSoloOnly(this IScenario scenario) => scenario.SupportsSolo && scenario.AiStrats.Count == 0;
+
     // Menu label, e.g. "P5 Delta".
     public static string DisplayName(this IScenario scenario)
     {
@@ -66,5 +69,5 @@ public static class ScenarioExtensions
     }
 
     public static string FullName(this IScenario scenario)
-        => $"{scenario.Phase.Zone.Name} — {scenario.DisplayName()}";
+        => $"{scenario.Category} — {scenario.DisplayName()}";
 }

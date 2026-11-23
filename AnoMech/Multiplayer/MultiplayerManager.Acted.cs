@@ -39,6 +39,8 @@ public sealed partial class MultiplayerManager
         if (Session.RoleOf(acted.PeerId) is not { } seat || !running || !hostScenarioStarted) return;
         if (!Enum.IsDefined(acted.Step) || acted.ActionType != ActionType.Action || !SimAssets.AllowAction(acted.ActionId, "a player's action")) return;
         ShowAction(seat, acted.Step, acted.ActionId, HostObjectOf(acted.Target), NetGuard.Clamp(acted.CastSeconds, 0f, NetGuard.MaxPlayerCastSeconds));
+        if (acted.Step == PlayerActionStep.Resolved && Plugin.Game.World.Party.Get(seat) is { } member)
+            Natives.UserActions.OnPartyAction(member, acted.ActionId);
         // The party has one gauge, the host's, which every client shows: a peer's own client only
         // emptied its copy.
         if (acted.Step == PlayerActionStep.Resolved && LimitBreakHandler.IsLimitBreak(acted.ActionId))

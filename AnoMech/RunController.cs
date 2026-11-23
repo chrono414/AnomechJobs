@@ -3,6 +3,7 @@ using AnoMech.Core.Game;
 using AnoMech.Core.Game.Party;
 using AnoMech.Core.Native.Implementations;
 using AnoMech.Multiplayer;
+using AnoMech.Scenarios;
 
 namespace AnoMech;
 
@@ -30,7 +31,11 @@ internal sealed class RunController
     public string? StartRefusal(ScenarioSelection? selection, bool solo)
     {
         if (selection is not { Scenario: var scenario }) return "No scenario selected.";
+        solo |= scenario.IsSoloOnly();
         if (solo && !scenario.SupportsSolo) return $"{scenario.Name} does not support Solo mode.";
+        var zone = scenario.Phase.Zone;
+        if (zone.PracticeLevel is { } level && Plugin.PlayerState.Level < level)
+            return $"Equip a level {level} job to start.";
         // Starting here bypasses MultiplayerManager: a host would run the fight without a
         // StartMessage, a peer would start a second independent simulation.
         if (scenario.SupportsMultiplayer && multiplayer.IsConnected)
@@ -50,6 +55,7 @@ internal sealed class RunController
             Plugin.Log.Warning(refusal);
             return;
         }
+        solo |= selection!.Scenario.IsSoloOnly();
         var party = new LocalPartyProvider { RoleOverride = selection!.RoleOverride, Solo = solo };
         var p = new RunScenarioParams(selection.Scenario, party, solo ? null : selection.Strat, selection.Waymark, selection.Seed);
         ZoneControl.EndSpeedBuffs();

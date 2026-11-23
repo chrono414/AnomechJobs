@@ -38,6 +38,7 @@ public interface IBattleCharaProxy
     void NpcKnockback(Vector3 position, float rotation, float durationSeconds);
 
     float HitboxRadius { get; }
+    void SetHitboxRadius(float radius);
 
     // ── Model ────────────────────────────────────────────────────────────────
 

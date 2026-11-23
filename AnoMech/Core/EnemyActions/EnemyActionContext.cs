@@ -64,7 +64,7 @@ public sealed class EnemyActionContext
     // row. The first push wins.
     public void Knockback(SimCharacter who, float distance, float speed, float? delay = null, uint? knockbackRow = null, bool resistible = false)
     {
-        if (resistible && who.HasStatus(Mitigation.SurecastStatusId)) return;
+        if (resistible && Mitigation.ResistsKnockback(who)) return;
         var row = knockbackRow is { } id ? Natives.Data.Knockback(id) : null;
         var from = row switch
         {

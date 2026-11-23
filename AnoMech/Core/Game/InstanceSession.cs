@@ -54,7 +54,7 @@ public sealed class InstanceSession
         if (!Natives.Zone.IsActive) // defensive check, should always be true
         {
             AddRsData(init); // need to be done before Enter
-            if (!Natives.Zone.Enter(zone.TerritoryId, init.EntranceBarrier.Position))
+            if (!Natives.Zone.Enter(zone.TerritoryId, init.EntranceBarrier.Position, zone.PracticeLevel))
             {
                 refusal = "the zone was not entered (see the log)";
                 return null;

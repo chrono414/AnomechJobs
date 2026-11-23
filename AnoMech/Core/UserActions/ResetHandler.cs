@@ -14,6 +14,7 @@ internal sealed class ResetHandler : IUserActionHandler
     public void OnScenarioStart()
     {
         RecastTimes.ClearAll();
+        PlayerCombo.Seed(0, 0);
         ClearGauge();
         if (Plugin.Game?.Player is { } player) JobActions.ApplyStartingResources(player, rng);
     }

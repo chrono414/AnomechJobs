@@ -30,8 +30,16 @@ internal sealed unsafe class ActionEffectHandler : IUserActionHandler
                 sequence));
             return;
         }
+        if (actionId == PaladinStateHandler.PassageAction)
+        {
+            player.ReceiveActionEffect(PaladinStateHandler.PassageEffect(player.GameObjectId, player.Position,
+                player.Rotation, sequence));
+            return;
+        }
 
         // SourceSequence makes the client treat it as that action resolving.
+        var previousCombo = am->Combo.Action;
+        var comboRemaining = am->Combo.Timer;
         var groundTargeted = location.HasValue && Natives.Data.Action(actionId) is { TargetArea: true };
         var target = groundTargeted ? default : DeliveryTarget(player, targetId);
         // A zero-lock reply clears the lock the client started for an instant action.
@@ -44,6 +52,17 @@ internal sealed unsafe class ActionEffectHandler : IUserActionHandler
                 ? new ActionEffectTarget(target)
                 : new ActionEffectTarget(target, [ActionEffectEntry.ActionMarker(actionId, role == ComboRole.Continuation)])],
             SourceSequence: sequence));
+
+        // Use the native combo for button swaps and Vipersight, with Viper's full route rules
+        // taking precedence over the sheet's single-prerequisite model.
+        if (PlayerJob.Current == JobId.Viper &&
+            ViperBasicCombo.NextState(actionId, role, previousCombo, comboRemaining) is { } combo)
+            PlayerCombo.Seed(combo.Action, combo.Remaining);
+        else if (PlayerJob.Current == JobId.Machinist &&
+            PlayerCombo.MachinistNextState(actionId, role) is { } shot)
+            PlayerCombo.Seed(shot.Action, shot.Remaining);
+        else if (PaladinStateHandler.IsConfiteorCombo(actionId) && comboRemaining > 0f)
+            PlayerCombo.Seed(previousCombo, comboRemaining);
     }
 
     internal static ActionEffectData LeyLinesEffect(uint actionId, GameObjectId self, Vector3 worldPosition,

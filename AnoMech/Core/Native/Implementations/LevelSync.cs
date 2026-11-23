@@ -28,9 +28,9 @@ internal sealed unsafe class LevelSync
         statsSynced = false;
     }
 
-    public void Apply(ContentFinderCondition cfc, Character* player, byte classJobId)
+    public void Apply(ContentFinderCondition cfc, Character* player, byte classJobId, byte? practiceLevel)
     {
-        var cfcLevelSync = cfc.ClassJobLevelSync;
+        var cfcLevelSync = practiceLevel ?? cfc.ClassJobLevelSync;
         var currentLevel = (byte)Plugin.PlayerState.Level;
         levelSynced = cfcLevelSync != 0 && currentLevel > cfcLevelSync;
 
@@ -50,6 +50,7 @@ internal sealed unsafe class LevelSync
             SendCharacterLevel(player, cfcLevelSync);
         }
 
+        if (practiceLevel.HasValue) return;
         var ilvlSync = cfc.ItemLevelSync != 0 ? cfc.ItemLevelSync : cfc.ItemLevelRequired;
 
         if (ilvlSync != 0)

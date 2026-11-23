@@ -4,7 +4,11 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 
 namespace AnoMech.Core.Native.Implementations;
 
-internal readonly record struct RecastSeed(uint ActionId, int MaxCharges, int Available, int RechargeSeconds, int SecondsToNext);
+internal readonly record struct RecastSeed(uint ActionId, int MaxCharges, int Available, int RechargeSeconds, int SecondsToNext)
+{
+    internal float Total => MaxCharges * RechargeSeconds;
+    internal float Elapsed => (Available + 1) * RechargeSeconds - SecondsToNext;
+}
 
 // The local player's recast groups, set the way the server does: its full recast-times packet.
 internal static unsafe class RecastTimes
@@ -17,6 +21,18 @@ internal static unsafe class RecastTimes
         PacketDispatcherPointers.HandleUpdateRecastTimesPacket(player.EntityId, &packet);
     }
 
+    internal static void Advance(uint actionId, float seconds)
+    {
+        var manager = ActionManager.Instance();
+        if (manager == null) return;
+        var group = manager->GetRecastGroup((int)ActionType.Action, actionId);
+        if ((uint)group >= UpdateRecastTimesPacket.Capacity) return;
+        var recast = manager->GetRecastGroupDetail(group);
+        if (recast == null || !recast->IsActive) return;
+        recast->Elapsed = Math.Min(recast->Total, recast->Elapsed + seconds);
+        if (recast->Elapsed >= recast->Total) recast->IsActive = false;
+    }
+
     // The run reset has already cleared every group. Submit the overrides together.
     internal static void SeedAfterReset(ReadOnlySpan<RecastSeed> seeds)
     {
@@ -26,16 +42,31 @@ internal static unsafe class RecastTimes
         foreach (var seed in seeds)
         {
             if (seed.SecondsToNext == 0) continue;
-            var group = manager->GetRecastGroup((int)ActionType.Action, seed.ActionId);
+            var actionId = manager->GetAdjustedActionId(seed.ActionId);
+            var group = manager->GetRecastGroup((int)ActionType.Action, actionId);
             if ((uint)group >= UpdateRecastTimesPacket.Capacity) continue;
             // Each full recharge interval in Elapsed represents one usable charge.
-            packet.Total[group] = seed.MaxCharges * seed.RechargeSeconds;
-            packet.Elapsed[group] = (seed.Available + 1) * seed.RechargeSeconds - seed.SecondsToNext;
+            packet.Total[group] = seed.Total;
+            packet.Elapsed[group] = seed.Elapsed;
         }
         PacketDispatcherPointers.HandleUpdateRecastTimesPacket(player.EntityId, &packet);
-#if DEBUG
         foreach (var seed in seeds)
-            DiagnosticLog.Debug($"[Job settings] Action {seed.ActionId}: available charges {manager->GetCurrentCharges(seed.ActionId)}/{seed.Available}, requested next charge {seed.SecondsToNext}s.");
+        {
+            if (seed.SecondsToNext == 0) continue;
+            var actionId = manager->GetAdjustedActionId(seed.ActionId);
+            var group = manager->GetRecastGroup((int)ActionType.Action, actionId);
+            if ((uint)group >= UpdateRecastTimesPacket.Capacity) continue;
+            var detail = manager->GetRecastGroupDetail(group);
+            if (detail == null) continue;
+            // The timer packet has no ActionId. Charge handling needs the action that owns
+            // the active recast, including the currently unlocked form of upgraded actions.
+            detail->ActionId = actionId;
+            detail->Total = packet.Total[group];
+            detail->Elapsed = packet.Elapsed[group];
+            detail->IsActive = true;
+#if DEBUG
+            DiagnosticLog.Debug($"[Job settings] Action {actionId} (group {group}): available charges {manager->GetCurrentCharges(actionId)}/{seed.Available}, recast {detail->Elapsed:F2}/{detail->Total:F2}s, requested next charge {seed.SecondsToNext}s.");
 #endif
+        }
     }
 }

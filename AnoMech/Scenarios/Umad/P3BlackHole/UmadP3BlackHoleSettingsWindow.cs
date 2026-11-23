@@ -19,10 +19,19 @@ public sealed class UmadP3BlackHoleSettingsWindow
     public void Draw()
     {
         var solo = !PerRole.SeatsActive;
+        var mpGuest = Plugin.Multiplayer is { IsConnected: true, IsHost: false };
+        var automarkers = Overrides.Automarkers;
+        ImGui.BeginDisabled(mpGuest);
+        if (ImGui.Checkbox("Automarkers", ref automarkers)) Overrides.Automarkers = automarkers;
+        ImGui.EndDisabled();
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip(mpGuest
+                ? "The host controls automarkers."
+                : "Mark the party's line and Accretion assignments using the selected tether order.");
 #if !DEBUG
         if (!solo)
         {
-            ImGui.TextDisabled("Everything here is per player -- use the button below.");
+            ImGui.TextDisabled("Use the button below for per-player settings.");
             return;
         }
 #endif

@@ -243,7 +243,7 @@ public sealed partial class MultiplayerManager
             {
                 var who = Session.NameOf(applied.PeerId);
                 if (Session.RoleOf(applied.PeerId) is null) break;
-                if (!AnoMech.Core.UserActions.Mitigation.ByStatusId.ContainsKey(applied.StatusId))
+                if (!Mitigation.IsOutgoingStatus(applied.StatusId))
                 {
                     DiagnosticLog.Warn($"[Multiplayer] Host: {who} reported enemy status {applied.StatusId}, which is no known mitigation -- dropping.");
                     break;
@@ -268,7 +268,8 @@ public sealed partial class MultiplayerManager
                 var who = Session.NameOf(applied.PeerId);
                 if (Session.RoleOf(applied.PeerId) is not { } reporter) break;
                 var sprint = applied.StatusId == SprintHandler.SprintStatusId;
-                if (!sprint && !Mitigation.ByStatusId.ContainsKey(applied.StatusId))
+                var knockbackImmunity = Mitigation.IsKnockbackImmunity(applied.StatusId);
+                if (!sprint && !knockbackImmunity && !Mitigation.ByStatusId.ContainsKey(applied.StatusId))
                 {
                     DiagnosticLog.Warn($"[Multiplayer] Host: {who} reported role status {applied.StatusId}, which is no known mitigation -- dropping.");
                     break;
@@ -276,8 +277,7 @@ public sealed partial class MultiplayerManager
                 var duration = NetGuard.Clamp(applied.Duration, 0f, NetGuard.MaxMitigationSeconds);
                 foreach (var role in NetGuard.Cap(applied.Roles, 8).Where(Enum.IsDefined))
                 {
-                    // Sprint is only ever a player's own.
-                    if (sprint && role != reporter) continue;
+                    if ((sprint || knockbackImmunity) && role != reporter) continue;
                     if (Plugin.Game.World.Party.Get(role) is not { } member)
                     {
                         DiagnosticLog.Warn($"[Multiplayer] Host: {who} reported status {applied.StatusId} on role {role}, but that slot is empty -- dropping.");

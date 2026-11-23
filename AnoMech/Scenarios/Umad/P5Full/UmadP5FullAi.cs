@@ -30,9 +30,6 @@ internal static class UmadP5FullAi
                 : position;
         }, speed: 14f);
 
-    public static void MoveToCenter(SimParty party) =>
-        Move(party, _ => Vector3.Zero, speed: 8.3f);
-
     public static void RotateFlood(SimParty party, int quadrant) =>
         Move(party, slot =>
         {

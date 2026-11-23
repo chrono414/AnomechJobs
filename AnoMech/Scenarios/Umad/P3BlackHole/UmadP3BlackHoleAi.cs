@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using AnoMech.Core.Game.Ai;
 using AnoMech.Core.Game.Party;
+using AnoMech.Core.Native.Interfaces;
 using AnoMech.Core.SimObjects;
 using static AnoMech.Scenarios.Umad.UmadConstants;
 
@@ -26,6 +27,25 @@ public sealed class UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder tetherOrder)
 
     private int TetherSeat(int seat) =>
         tetherOrder == TetherOrder.SupportDpsAccretion ? SupportsBeforeDps[seat] : seat;
+
+    private static readonly Sign[] DpsFirstSignsByDebuffSlot =
+    [
+        Sign.Attack2, Sign.Bind2, Sign.Ignore2, Sign.Attack3,
+        Sign.Attack1, Sign.Bind1, Sign.Ignore1, Sign.Bind3,
+    ];
+
+    internal void ScheduleAutomarkers(SimWorld world, RoleList roles)
+    {
+        new AiManager(world).Automarker(8.38f, () => MarkerMapping(roles));
+        world.Events.Add(160f, () =>
+        {
+            foreach (var sign in DpsFirstSignsByDebuffSlot) world.Party.ClearMark(sign);
+        });
+    }
+
+    internal Dictionary<PartyRole, Sign> MarkerMapping(RoleList roles)
+        => DpsFirstSignsByDebuffSlot.Select((sign, slot) => (Sign: sign, Role: roles[TetherSeat(slot)]))
+                                    .ToDictionary(mark => mark.Role, mark => mark.Sign);
 
     private UmadP3BlackHoleState state = null!;
     private SimWorld world = null!;

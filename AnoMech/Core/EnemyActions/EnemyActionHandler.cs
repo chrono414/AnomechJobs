@@ -202,6 +202,11 @@ internal sealed class EnemyActionHandler(SimCharacter caster, SimCast cast, SimW
                     }
                 });
             }
+            if (!action.ResolveOnly && !outcome.Killed && outcome.Damage is { Amount: > 0 })
+                Schedule(action.Timing.DamageDelay, () =>
+                {
+                    if (who.IsAlive()) Natives.UserActions?.OnDamageTaken(who);
+                });
             if (outcome.Killed)
                 Schedule(action.Timing.DamageDelay, () => who.Die(action.ActionId, Explain(action.DeathExplanation, outcome.Explanation)));
         }

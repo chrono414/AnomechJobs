@@ -21,31 +21,31 @@ _✅ works · ⚠️ partial · ❌ not simulated · ➖ nothing to simulate (pu
 | Swiftskin's Bite | 34617 | ✅ | Swiftscaled (AoE) |
 | Jagged Maw | 34618 | ✅ | +10 SO; grants Grimskin's, consumes Grimhunter's |
 | Bloodied Maw | 34619 | ✅ | +10 SO; grants Grimhunter's, consumes Grimskin's |
-| Serpent's Tail | 35920 | ✅ | Swap → Death Rattle / Last Lash / Legacy, driven by SerpentComboState (handler) |
+| Serpent's Tail | 35920 | ✅ | Death Rattle, Last Lash, or a Legacy use one follow-up press in SerpentComboState. |
 | Death Rattle | 34634 | ➖ | Pure-damage oGCD; combo-state clear handled |
 | Last Lash | 34635 | ➖ | Pure-damage AoE oGCD; combo-state clear handled |
-| Vicewinder | 34620 | ✅ | +1 Rattling Coil; opens dread route |
-| Hunter's Coil | 34621 | ✅ | +5 SO; Hunter's Instinct; Hunter's Venom |
-| Swiftskin's Coil | 34622 | ✅ | +5 SO; Swiftscaled; Swiftskin's Venom |
-| Vicepit | 34623 | ✅ | +1 Rattling Coil (AoE) |
-| Hunter's Den | 34624 | ✅ | +5 SO; Hunter's Instinct; Fellhunter's Venom |
-| Swiftskin's Den | 34625 | ✅ | +5 SO; Swiftscaled; Fellskin's Venom |
-| Twinfang | 35921 | ✅ | Swap → Bite/Thresh, driven by DreadCombo (handler); Uncoiled route via Poised status |
-| Twinblood | 35922 | ✅ | Swap → Bite/Thresh, driven by DreadCombo (handler) |
-| Twinfang Bite | 34636 | ⚠️ | Consumes Hunter's Venom; reciprocal Swiftskin's Venom grant not modelled |
-| Twinblood Bite | 34637 | ⚠️ | Consumes Swiftskin's Venom; reciprocal Hunter's Venom grant not modelled |
-| Twinfang Thresh | 34638 | ⚠️ | Consumes Fellhunter's Venom; reciprocal Fellskin's Venom grant not modelled |
-| Twinblood Thresh | 34639 | ⚠️ | Consumes Fellskin's Venom; reciprocal Fellhunter's Venom grant not modelled |
-| Uncoiled Fury | 34633 | ✅ | Poised for Twinfang; −1 Rattling Coil (cost 87) |
-| Serpent's Ire | 34647 | ✅ | +1 Rattling Coil; Ready to Reawaken |
-| Reawaken | 34626 | ⚠️ | +5 Anguine Tribute; Reawakened; −50 SO. Ready-to-Reawaken free cast still charges 50 SO |
-| First Generation | 34627 | ✅ | Arms First Legacy (handler); −1 Anguine Tribute (cost 89) |
-| Second Generation | 34628 | ✅ | Arms Second Legacy; −1 Anguine Tribute (cost 89) |
-| Third Generation | 34629 | ✅ | Arms Third Legacy; −1 Anguine Tribute (cost 89) |
-| Fourth Generation | 34630 | ✅ | Arms Fourth Legacy; −1 Anguine Tribute (cost 89) |
-| Uncoiled Twinfang | 34644 | ✅ | Poised for Twinblood; consumes Poised for Twinfang |
-| Uncoiled Twinblood | 34645 | ✅ | Consumes Poised for Twinblood |
-| Ouroboros | 34631 | ✅ | Expires Reawakened; −1 Anguine Tribute (cost 90) |
+| Vicewinder | 34620 | ✅ | +1 Rattling Coil. Opens both Coils and clears the Coil venoms. |
+| Hunter's Coil | 34621 | ✅ | +5 SO at 90+. Grants Hunter's Instinct and, at 75+, Hunter's Venom with two Bite presses. |
+| Swiftskin's Coil | 34622 | ✅ | +5 SO at 90+. Grants Swiftscaled and, at 75+, Swiftskin's Venom with two Bite presses. |
+| Vicepit | 34623 | ✅ | +1 Rattling Coil. Opens both Dens and clears the Den venoms. |
+| Hunter's Den | 34624 | ✅ | +5 SO at 90+. Grants Hunter's Instinct and, at 80+, Fellhunter's Venom with two Thresh presses. |
+| Swiftskin's Den | 34625 | ✅ | +5 SO at 90+. Grants Swiftscaled and, at 80+, Fellskin's Venom with two Thresh presses. |
+| Twinfang | 35921 | ✅ | Native swap to Bite, Thresh, or Uncoiled Twinfang uses SerpentComboState. |
+| Twinblood | 35922 | ✅ | Native swap to Bite, Thresh, or Uncoiled Twinblood uses SerpentComboState. |
+| Twinfang Bite | 34636 | ✅ | A buffed first press passes Hunter's Venom to Swiftskin's Venom. The second press closes the window. |
+| Twinblood Bite | 34637 | ✅ | A buffed first press passes Swiftskin's Venom to Hunter's Venom. The second press closes the window. |
+| Twinfang Thresh | 34638 | ✅ | A buffed first press passes Fellhunter's Venom to Fellskin's Venom. The second press closes the window. |
+| Twinblood Thresh | 34639 | ✅ | A buffed first press passes Fellskin's Venom to Fellhunter's Venom. The second press closes the window. |
+| Uncoiled Fury | 34633 | ✅ | Spends one Rattling Coil. At 92+, grants Poised for Twinfang and arms two Uncoiled presses. |
+| Serpent's Ire | 34647 | ✅ | +1 Rattling Coil. Grants Ready to Reawaken at 90+. |
+| Reawaken | 34626 | ✅ | Spends 50 SO, waived under Ready to Reawaken. Starts the Generation route with four Tribute, or five at 96+. |
+| First Generation | 34627 | ✅ | Spends one Tribute and advances the route. Arms First Legacy at 100. |
+| Second Generation | 34628 | ✅ | Spends one Tribute and advances the route. Arms Second Legacy at 100. |
+| Third Generation | 34629 | ✅ | Spends one Tribute and advances the route. Arms Third Legacy at 100. |
+| Fourth Generation | 34630 | ✅ | Spends one Tribute and closes the Generation route. Arms Fourth Legacy at 100. |
+| Uncoiled Twinfang | 34644 | ✅ | A buffed first press transfers Poised to Twinblood. The second press closes the window. |
+| Uncoiled Twinblood | 34645 | ✅ | Consumes its follow-up press. Using it first without Poised ends both Poised effects. |
+| Ouroboros | 34631 | ✅ | Available at 96+ after Fourth Generation. Spends the last Tribute and ends Reawaken. |
 | First Legacy | 34640 | ➖ | Pure-damage oGCD; combo-state clear handled |
 | Second Legacy | 34641 | ➖ | Pure-damage oGCD |
 | Third Legacy | 34642 | ➖ | Pure-damage oGCD |
@@ -57,7 +57,5 @@ All potency, native button-swaps, or gauge-max traits already reflected in gauge
 ## Role actions
 Second Wind, Leg Sweep, Bloodbath, Feint, Arm's Length, True North — all ➖.
 
-## Not simulated
-- **Reciprocal venom grants on Twinfang/Twinblood Bite/Thresh (34636–34639) not modelled.** Each consumes its venom, but the combo-conditional grant of the sibling venom (Swiftskin's/Hunter's/Fellskin's/Fellhunter's) isn't written.
-- **Ready to Reawaken (3671) free cast not honoured.** Reawaken still spends 50 Serpent Offering via `ApplyCost` even when the status should waive the cost.
-- **Combo-state swap packing unconfirmed in-game.** `ViperStateHandler` writes `SerpentComboState` (0x10, stored as `enum << 2`) and `DreadCombo` (0x0B) to drive the Serpent's Tail and Twinfang/Twinblood swaps; the exact bit layout (low 2 bits of SerpentComboState assumed unused) needs in-game verification.
+## In-game verification
+Check native hotbar swaps at levels 90 and 100, the Last Lash press count, and follow-up expiry when an intervening weaponskill is used. Check both Coil and Den branch orders, both press orders, and the Generation shown after a preset restart.

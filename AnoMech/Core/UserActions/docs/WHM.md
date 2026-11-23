@@ -33,11 +33,11 @@ _✅ works · ⚠️ partial · ❌ not simulated · ➖ nothing to simulate (pu
 | Glare | 16533 | ➖ | |
 | Afflatus Misery | 16535 | ✅ | −3 Blood Lily (cost 56); full-bloom gate reads the gauge. |
 | Afflatus Rapture | 16534 | ✅ | −1 Lily (cost 57), +1 Blood Lily. |
-| Temperance | 16536 | ✅ | Grants Divine Grace (3881, 30s). |
+| Temperance | 16536 | ✅ | Applies the caster's healing buff and the party mitigation aura as separate statuses. Grants Divine Grace at level 100. |
 | Glare III | 25859 | ➖ | |
 | Holy III | 25860 | ➖ | Stun is on the enemy. |
 | Aquaveil | 25861 | ➖ | |
-| Liturgy of the Bell | 25862 | ➖ | |
+| Liturgy of the Bell | 25862 / 28509 | ⚠️ | Places the bell and swaps to manual detonation. Pulses and detonation play their effects without changing HP. |
 | Glare IV | 37009 | ✅ | Consumes 1 Sacred Sight (3879) per cast. |
 | Medica III | 37010 | ➖ | |
 | Divine Caress | 37011 | ✅ | Consumes Divine Grace (3881). |

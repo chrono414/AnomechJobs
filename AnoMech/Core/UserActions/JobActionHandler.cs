@@ -1,13 +1,11 @@
 using System;
+using AnoMech.Core.SimObjects;
 using FFXIVClientStructs.FFXIV.Client.Game;
 
 namespace AnoMech.Core.UserActions;
 
-// Applies a player action's client-side effects from the JobActions table: first clears
-// any statuses the action ends (StatusClearedOnAction), then applies its effects — gauge
-// writes and status grants, gated by Combo(...) / Random(...) wrappers. Replaces the old
-// resource-generation and Continuation handlers. MUST run before ActionEffectHandler: combo-gated
-// effects read the PRE-advance combo state, which ActionEffectHandler advances.
+// Read waiver and follow-up eligibility before consuming statuses. The native combo
+// still reflects the pre-action step here, before ActionEffectHandler advances it.
 internal sealed class JobActionHandler : IUserActionHandler
 {
     private readonly Random rng = new();
@@ -18,10 +16,38 @@ internal sealed class JobActionHandler : IUserActionHandler
         var player = Plugin.Game?.Player;
         if (player == null) return;
 
-        // Clear first so a line action can re-grant after its own weaponskill clear.
+        var earnsFury = PlayerJob.Level >= 96 && actionId is 3549 or 3550 && player.HasStatus(1177);
+        var waiver = GaugeCostWaiver(actionId);
+        if (waiver == 0 || !player.HasStatus(waiver)) JobActions.ApplyCost(actionId);
         JobActions.ClearStatuses(player, actionId);
-        JobActions.ApplyCost(actionId);   // generic spender pass (sheet PrimaryCost)
 
         JobActions.ApplyEffects(player, actionId, targetId, rng);
+        if (earnsFury && ActionTargets.Hostile(new ActionContext(actionId, targetId, player, rng)).Count > 0)
+            AddBurgeoningFury(player);
     }
+
+    private static void AddBurgeoningFury(SimPlayer player)
+    {
+        const ushort burgeoningFury = 3833, wrathful = 3901;
+        var stacks = (player.FindStatus(burgeoningFury)?.Stacks ?? 0) + 1;
+        player.RemoveStatus(burgeoningFury);
+        if (stacks < 3) player.AddStatusParam(burgeoningFury, stacks, 30f);
+        else
+        {
+            player.RemoveStatus(wrathful);
+            player.AddStatusParam(wrathful, 0, 30f);
+        }
+    }
+
+    internal static ushort GaugeCostWaiver(uint actionId) => actionId switch
+    {
+        3549 or 3550 => 1177, // Inner Release
+        17209 => 3864,         // Hypercharged
+        24394 => 3905,         // Ideal Host
+        34626 => 3671,         // Ready to Reawaken
+        _ => 0,
+    };
+
+    internal static bool UsesDivineMight(uint actionId, SimPlayer player)
+        => actionId is 7384 or 16458 && player.HasStatus(2673);
 }

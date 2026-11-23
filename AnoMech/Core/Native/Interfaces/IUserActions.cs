@@ -1,4 +1,5 @@
 using System;
+using AnoMech.Core.SimObjects;
 
 namespace AnoMech.Core.Native.Interfaces;
 
@@ -15,6 +16,10 @@ public interface IUserActions : IDisposable
     void OnSessionEnd();
 
     void Tick(float deltaSeconds);
+    void OnEnemyDefeated(SimEnemy enemy) { }
+    void OnDamageTaken(SimCharacter target) { }
+    void OnStatusExpired(SimCharacter target, ushort statusId) { }
+    void OnPartyAction(SimCharacter member, uint actionId) { }
 
     // Each step the server would show the rest of the party, whether the module is on or not:
     // the player's own client has already played it for them.

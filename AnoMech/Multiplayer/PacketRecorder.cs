@@ -360,6 +360,7 @@ internal sealed class PacketRecorder
         public Vector3 Position => inner.Position;
         public float Rotation => inner.Rotation;
         public float HitboxRadius => inner.HitboxRadius;
+        public void SetHitboxRadius(float radius) => inner.SetHitboxRadius(radius);
         public bool HasDrawObject => inner.HasDrawObject;
         public bool IsDrawObjectVisible => inner.IsDrawObjectVisible;
         public byte ModelState => inner.ModelState;
@@ -538,7 +539,8 @@ internal sealed class PacketRecorder
         public void EndSpeedBuffs() => Real.EndSpeedBuffs();
         public bool IsActive => Real.IsActive;
         public void TickGuard() => Real.TickGuard();
-        public bool Enter(uint territoryId, Vector3 playerSpawn) => Real.Enter(territoryId, playerSpawn);
+        public bool Enter(uint territoryId, Vector3 playerSpawn, byte? practiceLevel = null)
+            => Real.Enter(territoryId, playerSpawn, practiceLevel);
         public void Revert() => Real.Revert();
 
         public void ApplyWeather(byte weatherId)
