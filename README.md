@@ -7,6 +7,7 @@ Added:
 - Full job rotations and starting state preset implementations for PLD, WAR, SGE, WHM, BLM, MCH, VPR, RPR
 - DMU P5 Maddening Orchestra with 3 different party placement options
 - DMU Full P5
+- Lvl 100 dummy scenario
 - Fixed DMU P5 Forsaken bait puddle and blackhole logic so it's no longer hardcoded (this is still a solo mechanic, bots will not move but the stack marker and puddles will be baited on the player. You can execute the strategy that you want.) 
 
 Known issues:
