@@ -1,11 +1,30 @@
 
 # ![AnomechJobs](images/icon.png) AnomechJobs
 
-*Another FFXIV mechanics simulator*
+This is an alternate vibecoded (aka I've not read the code) version of the original anomech. AnomechJobs extends AnoMech with job rotation simulation, configurable starting presets, and additional Dancing Mad (Ultimate) P5 practice.
 
-AnomechJobs extends AnoMech with job rotation simulation, configurable starting presets, and additional Dancing Mad (Ultimate) practice.
+Added:
+- Full job rotations and starting state preset implementations for PLD, WAR, SGE, WHM, BLM, MCH, VPR, RPR
+- DMU P5 Maddening Orchestra with 3 different party placement options
+- DMU Full P5
+- Fixed DMU P5 Forsaken bait puddle and blackhole logic so it's no longer hardcoded (this is still a solo mechanic, bots will not move but the stack marker and puddles will be baited on the player. You can execute the strategy that you want.) 
+
+Known issues:
+- SGE addersting generation from eukrasian prognosis and eukrasian diagnosis is not fully implemented (you may not get addersting from mechanics damage). As a work around there is an option for unlimited toxicon in job settings.
+- Only lvl 100 rotations are tested. Not all starting state options were tested.
+- WHM lilybell may not always proc on mechanics damage, proc animation may not be implemented yet.
+
+Any issues pls raise. 
 
 ---
+
+## Installation
+
+Open `/xlsettings` → **Experimental** → **Custom Plugin Repositories**. Add and enable the 
+
+**AnomechJobs repository feed:** https://raw.githubusercontent.com/chrono414/AnomechJobs/main/repo.json
+
+then open `/xlplugins` and install **AnomechJobs**.
  
 Simulate FFXIV raid mechanics client-side for solo practice. Go to any Inn, open the plugin with `/anomechjobs` and start practicing!
 
@@ -26,16 +45,6 @@ While simulating:
 ## Installation
 
 Open `/xlsettings` → **Experimental** → **Custom Plugin Repositories**. Add and enable the [AnomechJobs repository feed](https://raw.githubusercontent.com/chrono414/AnomechJobs/main/repo.json), then open `/xlplugins` and install **AnomechJobs**.
-
-### Publishing updates
-
-1. Set a higher four-part `Version` in `AnoMech/AnoMech.csproj` and push the release commit to the public release repository's default branch.
-2. In that repository, open **Actions → Release AnomechJobs → Run workflow** and select the default branch.
-3. Verify the install or update in Dalamud. The workflow builds the x64 Release ZIP, runs the solution tests, publishes a GitHub Release tagged with the assembly version, and updates `repo.json` after downloading and validating the public ZIP.
-
-Users keep the same feed URL across updates. If the release succeeded but the feed update failed, rerun the original workflow run to reuse that release. Each published version has its own tag and ZIP.
-
-AnomechJobs is based on [AnoMech by Anomek](https://github.com/anomek/AnoMech) and distributed under the [GNU AGPL](LICENSE.md).
 
 ## Beta: Advanced Simulation Resolution
 
