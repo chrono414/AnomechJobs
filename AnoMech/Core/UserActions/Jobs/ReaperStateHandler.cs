@@ -18,12 +18,13 @@ internal sealed unsafe class ReaperStateHandler : IUserActionHandler
     // UNVERIFIED: the retail radius for this point visual.
     private const float HellsgateRadius = 1f;
     private IDisposable? hellsgate;
+    private uint hellsgateDash;
     private bool wasEnshrouded;
 
     public void OnScenarioStart() => OnSessionEnd();
     public void OnSessionEnd()
     {
-        if (hellsgate != null) Plugin.Game?.Player?.RemoveStatus(Threshold);
+        if (hellsgateDash != 0) Plugin.Game?.Player?.RemoveStatus(Threshold);
         ClearHellsgate();
         wasEnshrouded = false;
     }
@@ -45,9 +46,14 @@ internal sealed unsafe class ReaperStateHandler : IUserActionHandler
 
         switch (actionId)
         {
-            case HellsIngress or HellsEgress when PlayerJob.Level >= HellsgateLevel && execution.Origin is { } origin:
+            case HellsIngress or HellsEgress when PlayerJob.Level >= HellsgateLevel:
                 ClearHellsgate();
-                hellsgate = AreaObjects.Spawn(HellsgateAreaObject, player.EntityId, HellsgateRadius, origin);
+                hellsgateDash = actionId;
+                if (execution.Origin is { } origin)
+                    hellsgate = AreaObjects.Spawn(HellsgateAreaObject, player.EntityId, HellsgateRadius, origin);
+                break;
+            case Regress:
+                ClearHellsgate();
                 break;
             case 24405 when PlayerJob.Level >= 88:
                 foreach (var member in ActionTargets.FriendlyWithin(player, 30f))
@@ -94,9 +100,27 @@ internal sealed unsafe class ReaperStateHandler : IUserActionHandler
         if (actionId is not (36970 or 36971 or 36972)) player.RemoveStatus(Executioner);
     }
 
+    public uint? AdjustActionId(uint actionId)
+    {
+        if (actionId is not (HellsIngress or HellsEgress) || hellsgateDash == 0 ||
+            PlayerJob.Current != JobId.Reaper || PlayerJob.Level < HellsgateLevel ||
+            Plugin.Game?.Player is not { Dead: false } player || !player.HasStatus(Threshold))
+            return null;
+
+        return actionId == hellsgateDash ? actionId : Regress;
+    }
+
+    public uint? AdjustActionStatus(ActionType actionType, uint actionId, bool checkRecast)
+    {
+        if (actionType != ActionType.Action || AdjustActionId(actionId) != Regress) return null;
+
+        var manager = ActionManager.Instance();
+        return manager == null ? null : manager->GetActionStatus(ActionType.Action, Regress, checkRecastActive: checkRecast);
+    }
+
     public void OnTick(float deltaSeconds)
     {
-        if (hellsgate != null && (PlayerJob.Current != JobId.Reaper ||
+        if (hellsgateDash != 0 && (PlayerJob.Current != JobId.Reaper ||
             Plugin.Game?.Player is not { Dead: false } reaper || !reaper.HasStatus(Threshold)))
             ClearHellsgate();
 
@@ -121,6 +145,7 @@ internal sealed unsafe class ReaperStateHandler : IUserActionHandler
 
     private void ClearHellsgate()
     {
+        hellsgateDash = 0;
         hellsgate?.Dispose();
         hellsgate = null;
     }

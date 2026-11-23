@@ -121,7 +121,7 @@ public sealed class UmadP5ForsakenNull : IScenario
 
         void CheckBlackHoleContact()
         {
-            if (contactRecorded || party.Player is not { } player || !player.IsAlive()) return;
+            if (contactRecorded || party.Player is not { } player || !player.IsAlive() || party.IsBotDriven(player)) return;
             foreach (var hole in activeBlackHoles)
             {
                 if (Vector3.DistanceSquared(player.Position, hole.Position) >

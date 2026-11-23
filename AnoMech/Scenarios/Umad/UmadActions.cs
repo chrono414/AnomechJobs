@@ -17,7 +17,7 @@ public static class UmadActions
     private static readonly AreaSpec ForsakenGroundArea = new()
     {
         CastTypeOverride = Core.Native.Interfaces.CastType.Circle,
-        AdjustTargets = (ctx, hits) => hits.Where(member => member == ctx.Party.Player || !ctx.Party.IsBotDriven(member)).ToArray(),
+        AdjustTargets = (ctx, hits) => hits.Where(member => !ctx.Party.IsBotDriven(member)).ToArray(),
     };
 
     internal static readonly EnemyAction ForsakenBlackHole = new(UmadP5ForsakenNull.Constants.ActionId.ForsakenGround)
